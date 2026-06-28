@@ -4,6 +4,9 @@
   "private": true,
   "description": "German & French learning maze with accounts and a local database.",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "scripts": {
     "start": "node --no-warnings server.js"
   }

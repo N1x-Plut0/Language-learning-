@@ -1,0 +1,15 @@
+# Render blueprint — deploys the Maze Academy server.
+# On Render: New + → Blueprint → pick this repo → Apply.
+# Render reads this file and sets everything up automatically.
+services:
+  - type: web
+    name: maze-academy
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node --no-warnings server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NO_OPEN          # don't try to open a browser on the server
+        value: "1"
