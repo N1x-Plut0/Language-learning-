@@ -15,6 +15,7 @@ const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { exec } = require("node:child_process");
 const { DatabaseSync } = require("node:sqlite");
 
 const PORT = process.env.PORT || 3000;
@@ -225,9 +226,20 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+function openBrowser(url) {
+  if (process.env.NO_OPEN) return; // hosting can set NO_OPEN=1 to skip
+  const cmd =
+    process.platform === "win32" ? `start "" "${url}"` :
+    process.platform === "darwin" ? `open "${url}"` :
+    `xdg-open "${url}"`;
+  exec(cmd, () => {});
+}
+
 server.listen(PORT, () => {
+  const url = `http://localhost:${PORT}`;
   console.log(`\n  Maze Academy is running.`);
-  console.log(`  Open  →  http://localhost:${PORT}\n`);
+  console.log(`  Open  →  ${url}\n`);
   console.log(`  (Accounts + progress are stored in data.db in this folder.)`);
   console.log(`  Press Ctrl+C to stop.\n`);
+  openBrowser(url); // auto-open the browser so you don't have to type the URL
 });
