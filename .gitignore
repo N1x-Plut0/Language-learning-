@@ -1,0 +1,13 @@
+# Local database (accounts + progress) — never commit user data
+data.db
+data.db-journal
+data.db-wal
+data.db-shm
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Local tooling (not part of the website)
+.claude/
+.agents/

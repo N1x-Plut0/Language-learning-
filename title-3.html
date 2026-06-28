@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maze Academy — Choose a Destination</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper:     #F4EBD0;
+      --paper-alt: #FDFAF0;
+      --sepia:     #7A6540;
+      --ink:       #2A1E0A;
+      --muted:     #8A7250;
+      --border:    rgba(42,30,10,0.22);
+    }
+    body {
+      min-height: 100dvh;
+      background: var(--paper);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% 100%, rgba(122,101,64,0.12) 0%, transparent 60%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      color: var(--ink);
+      font-family: 'Crimson Text', serif;
+      font-size: 18px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    /* ── HEADER ── */
+    .page-header {
+      text-align: center;
+      margin-bottom: 52px;
+      animation: riseIn 600ms ease-out both;
+    }
+    .bureau-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      border: 1.5px solid var(--border);
+      padding: 5px 20px;
+      font-family: 'Caveat', cursive;
+      font-size: 0.82rem;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .bureau-label::before, .bureau-label::after {
+      content: "✦";
+      opacity: 0.4;
+      font-size: 0.6rem;
+    }
+    .page-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+      font-weight: 700;
+      font-style: italic;
+      line-height: 1.2;
+    }
+    .page-sub {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    /* ── POSTCARDS GRID ── */
+    .postcards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 400px));
+      gap: 40px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* ── POSTCARD ── */
+    .postcard {
+      display: flex;
+      flex-direction: column;
+      background: var(--paper-alt);
+      border-radius: 3px;
+      text-decoration: none;
+      color: var(--ink);
+      box-shadow:
+        4px 6px 28px rgba(42,30,10,0.18),
+        0 1px 3px rgba(42,30,10,0.08),
+        inset 0 0 0 1px rgba(42,30,10,0.06);
+      position: relative;
+      transition: transform 320ms ease-out, box-shadow 320ms ease-out;
+    }
+    .card-de { transform: rotate(-1.2deg); }
+    .card-de:hover { transform: rotate(0deg) translateY(-10px) !important; box-shadow: 6px 18px 50px rgba(42,30,10,0.26); }
+    .card-fr { transform: rotate(0.9deg); }
+    .card-fr:hover { transform: rotate(0deg) translateY(-10px) !important; box-shadow: 6px 18px 50px rgba(42,30,10,0.26); }
+
+    /* Perforated inner border */
+    .postcard::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border: 1px dashed rgba(42,30,10,0.14);
+      border-radius: 1px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── IMAGE AREA ── */
+    .card-image {
+      height: 210px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      border-radius: 3px 3px 0 0;
+    }
+    .card-de .card-image {
+      background: linear-gradient(135deg, #241A0C 0%, #3C2B12 45%, #543C1A 100%);
+    }
+    .card-fr .card-image {
+      background: linear-gradient(135deg, #080E1E 0%, #0C1A38 45%, #112050 100%);
+    }
+
+    /* Ghost country text */
+    .dest-ghost {
+      position: absolute;
+      font-family: 'Playfair Display', serif;
+      font-size: 5rem;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      opacity: 0.05;
+      color: #fff;
+      white-space: nowrap;
+      transform: rotate(-5deg);
+      pointer-events: none;
+    }
+
+    /* Flag in image */
+    .card-flag {
+      display: flex;
+      border-radius: 3px;
+      overflow: hidden;
+      box-shadow: 0 5px 16px rgba(0,0,0,0.55);
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 2;
+    }
+    .flag-de { flex-direction: column; width: 68px; height: 46px; }
+    .flag-fr { flex-direction: row;    width: 44px; height: 62px; }
+    .card-flag span { flex: 1; display: block; }
+    .flag-de .c1 { background: #1C1812; }
+    .flag-de .c2 { background: #B83020; }
+    .flag-de .c3 { background: #E8B820; }
+    .flag-fr .c1 { background: #0055A4; }
+    .flag-fr .c2 { background: #fff; }
+    .flag-fr .c3 { background: #EF4135; }
+
+    .dest-label {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      font-style: italic;
+      color: rgba(255,255,255,0.88);
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Postmark circle */
+    .postmark {
+      position: absolute;
+      top: 14px;
+      right: 18px;
+      width: 68px;
+      height: 68px;
+      border: 2px solid rgba(255,255,255,0.14);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      overflow: hidden;
+    }
+    .postmark::before, .postmark::after {
+      content: "";
+      position: absolute;
+      width: 90%;
+      height: 1px;
+      background: rgba(255,255,255,0.12);
+    }
+    .postmark::before { transform: rotate(35deg); }
+    .postmark::after  { transform: rotate(-35deg); }
+    .postmark-inner {
+      font-family: 'Caveat', cursive;
+      font-size: 0.5rem;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.28);
+      text-align: center;
+      line-height: 1.6;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── CARD BODY ── */
+    .card-body {
+      padding: 24px 26px 28px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      position: relative;
+    }
+
+    /* Postage stamp */
+    .stamp {
+      position: absolute;
+      top: 20px;
+      right: 22px;
+      width: 50px;
+      height: 62px;
+      background: var(--paper);
+      border: 2px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      font-family: 'Caveat', cursive;
+      font-size: 0.5rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      box-shadow: 1px 1px 4px rgba(42,30,10,0.12);
+    }
+    .stamp::before {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border: 1px dotted rgba(42,30,10,0.20);
+    }
+    .stamp-val {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--ink);
+      position: relative;
+      z-index: 1;
+    }
+    .stamp-sub { position: relative; z-index: 1; text-transform: uppercase; }
+    .card-de .stamp { color: #7A5518; }
+    .card-fr .stamp { color: #1A3A88; }
+
+    .card-native {
+      font-family: 'Caveat', cursive;
+      font-size: 0.92rem;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .card-lang {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 900;
+      margin-bottom: 5px;
+      line-height: 1;
+    }
+    .card-cefr {
+      font-size: 0.84rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 16px;
+    }
+    .card-desc {
+      font-size: 0.97rem;
+      color: #5A4828;
+      line-height: 1.58;
+      margin-bottom: 22px;
+      max-width: 76%;
+    }
+    .card-cta {
+      display: inline-block;
+      align-self: flex-start;
+      padding: 10px 22px;
+      border: 1.5px solid var(--border);
+      border-radius: 3px;
+      font-family: 'Crimson Text', serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: 0.02em;
+      transition: background 200ms, border-color 200ms, transform 200ms;
+    }
+    .card-de .card-cta:hover {
+      background: rgba(192,120,40,0.11);
+      border-color: rgba(192,120,40,0.48);
+      transform: translateX(3px);
+    }
+    .card-fr .card-cta:hover {
+      background: rgba(0,85,164,0.09);
+      border-color: rgba(0,85,164,0.42);
+      transform: translateX(3px);
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 48px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-align: center;
+      animation: riseIn 600ms 300ms ease-out both;
+    }
+    .footer a { color: inherit; text-underline-offset: 3px; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .card-de { animation: tiltIn 580ms 80ms ease-out both; }
+    .card-fr { animation: tiltIn 580ms 180ms ease-out both; }
+    @keyframes tiltIn {
+      from { opacity: 0; transform: rotate(var(--rt, -1.2deg)) translateY(28px); }
+      to   { opacity: 1; }
+    }
+    .card-fr { --rt: 0.9deg; }
+    @media (prefers-reduced-motion: reduce) {
+      .page-header, .card-de, .card-fr, .footer { animation: none; }
+      .card-de { transform: none; }
+      .card-fr { transform: none; }
+    }
+
+    /* ── SIGN IN ── */
+    .signin-link {
+      position: fixed;
+      top: 22px;
+      right: 24px;
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 20px;
+      border: 1.5px solid var(--border);
+      border-radius: 3px;
+      background: var(--paper-alt);
+      color: var(--ink);
+      text-decoration: none;
+      font-family: 'Caveat', cursive;
+      font-size: 0.95rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      box-shadow: 2px 3px 10px rgba(42,30,10,0.14);
+      transition: transform 200ms, box-shadow 200ms, border-color 200ms;
+    }
+    .signin-link:hover { transform: translateY(-2px); box-shadow: 3px 5px 16px rgba(42,30,10,0.2); border-color: rgba(122,85,24,0.5); }
+    @media (max-width: 700px) { .signin-link { top: 14px; right: 14px; padding: 7px 15px; font-size: 0.86rem; } }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 700px) {
+      .postcards {
+        grid-template-columns: minmax(0, 400px);
+        max-width: 400px;
+      }
+      .card-de, .card-fr { transform: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <a class="signin-link" href="index.html#signin">Sign in →</a>
+
+  <header class="page-header">
+    <div class="bureau-label">Maze Academy</div>
+    <h1 class="page-title">Where shall we travel today?</h1>
+    <p class="page-sub">Choose a language and begin the journey.</p>
+  </header>
+
+  <div class="postcards">
+
+    <!-- German Postcard -->
+    <a class="postcard card-de" href="index.html#german" aria-label="Start learning German">
+      <div class="card-image">
+        <div class="dest-ghost" aria-hidden="true">GERMANY</div>
+        <div class="card-flag flag-de" aria-hidden="true">
+          <span class="c1"></span><span class="c2"></span><span class="c3"></span>
+        </div>
+        <p class="dest-label">Deutschland</p>
+        <div class="postmark" aria-hidden="true">
+          <div class="postmark-inner">MAZE<br>ACADEMY<br>A1 → C1</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="stamp" aria-hidden="true">
+          <span class="stamp-val">A1</span>
+          <span class="stamp-sub">START</span>
+        </div>
+        <p class="card-native">Deutsch</p>
+        <h2 class="card-lang">German</h2>
+        <p class="card-cefr">A1 Beginner → C1 Advanced</p>
+        <p class="card-desc">Grammar, vocabulary, and conversation — work through the maze at your own pace.</p>
+        <span class="card-cta">Begin journey →</span>
+      </div>
+    </a>
+
+    <!-- French Postcard -->
+    <a class="postcard card-fr" href="index.html#french-basics" aria-label="Start learning French">
+      <div class="card-image">
+        <div class="dest-ghost" aria-hidden="true">FRANCE</div>
+        <div class="card-flag flag-fr" aria-hidden="true">
+          <span class="c1"></span><span class="c2"></span><span class="c3"></span>
+        </div>
+        <p class="dest-label">La France</p>
+        <div class="postmark" aria-hidden="true">
+          <div class="postmark-inner">MAZE<br>ACADEMY<br>A1 → C2</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="stamp" aria-hidden="true">
+          <span class="stamp-val">A1</span>
+          <span class="stamp-sub">DÉPART</span>
+        </div>
+        <p class="card-native">Français</p>
+        <h2 class="card-lang">French</h2>
+        <p class="card-cefr">A1 Débutant → C2 Maîtrise</p>
+        <p class="card-desc">Phonetics, articles, and the full maze — six CEFR levels toward near-native fluency.</p>
+        <span class="card-cta">Commencer le voyage →</span>
+      </div>
+    </a>
+
+  </div>
+
+  <footer class="footer">
+    <a href="index.html">← Return to Maze Academy</a>
+  </footer>
+
+</body>
+</html>

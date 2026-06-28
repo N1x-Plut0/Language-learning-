@@ -1,0 +1,10 @@
+{
+  "name": "maze-academy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "German & French learning maze with accounts and a local database.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node --no-warnings server.js"
+  }
+}

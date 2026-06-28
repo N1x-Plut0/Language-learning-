@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maze Academy — Choose a Language</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --surface: #F5EDD5;
+      --ink: #1C1812;
+      --muted: #7A6E5F;
+      --border: rgba(28,24,18,0.18);
+      --shadow: 0 4px 22px rgba(28,24,18,0.10);
+      --shadow-lg: 0 12px 44px rgba(28,24,18,0.18);
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      min-height: 100dvh;
+      background: var(--surface);
+      background-image:
+        radial-gradient(ellipse 70% 55% at 12% 18%, rgba(192,120,40,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 42% at 88% 82%, rgba(0,85,164,0.08) 0%, transparent 55%);
+      color: var(--ink);
+      font-family: 'Crimson Text', serif;
+      font-size: 18px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      text-align: center;
+      margin-bottom: 44px;
+      max-width: 600px;
+      animation: fadeUp 520ms ease-out both;
+    }
+    .eyebrow {
+      font-family: 'Caveat', cursive;
+      font-size: 1.05rem;
+      color: #C07828;
+      letter-spacing: 0.1em;
+      margin-bottom: 14px;
+    }
+    .main-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 900;
+      line-height: 1.08;
+      margin-bottom: 18px;
+    }
+    .main-title em { font-style: italic; color: #C07828; }
+    .subtitle { color: var(--muted); font-size: 1.08rem; max-width: 430px; margin: 0 auto; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 44px;
+      width: 100%;
+      max-width: 880px;
+      animation: fadeUp 520ms 60ms ease-out both;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+    .diamond {
+      width: 7px; height: 7px;
+      background: var(--ink);
+      transform: rotate(45deg);
+      opacity: 0.22;
+    }
+
+    /* ── CARDS ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+      max-width: 880px;
+      width: 100%;
+    }
+    .lang-card {
+      display: flex;
+      flex-direction: column;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.50);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      text-decoration: none;
+      color: var(--ink);
+      transition: transform 280ms ease-out, box-shadow 280ms ease-out;
+    }
+    .lang-card:hover { transform: translateY(-7px) rotate(0.25deg); box-shadow: var(--shadow-lg); }
+    .lang-card:nth-child(1) { animation: fadeUp 520ms 80ms ease-out both; }
+    .lang-card:nth-child(2) { animation: fadeUp 520ms 160ms ease-out both; }
+
+    /* ── FLAG STRIP ── */
+    .flag-strip { display: flex; height: 6px; }
+    .flag-strip span { flex: 1; }
+    .de .s1 { background: #1C1812; }
+    .de .s2 { background: #B83020; }
+    .de .s3 { background: #E8B820; }
+    .fr .s1 { background: #0055A4; }
+    .fr .s2 { background: #fff; border-top: 1px solid rgba(0,0,0,0.06); border-bottom: 1px solid rgba(0,0,0,0.06); }
+    .fr .s3 { background: #EF4135; }
+
+    /* ── CARD BODY ── */
+    .card-body { padding: 30px 30px 26px; flex: 1; display: flex; flex-direction: column; }
+    .lang-native {
+      font-family: 'Caveat', cursive;
+      font-size: 1rem;
+      letter-spacing: 0.12em;
+      opacity: 0.45;
+      margin-bottom: 6px;
+    }
+    .lang-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.5rem;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .lang-range {
+      font-size: 0.86rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 20px;
+    }
+    .lang-desc {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.56;
+      margin-bottom: 22px;
+      flex: 1;
+    }
+
+    /* ── CHIPS ── */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+    .chip {
+      padding: 5px 14px;
+      border-radius: 999px;
+      font-family: 'Caveat', cursive;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.55);
+    }
+    .chip-de { border-color: rgba(192,120,40,0.42); color: #8A5818; background: rgba(192,120,40,0.07); }
+    .chip-fr { border-color: rgba(0,85,164,0.32); color: #1A4488; background: rgba(0,85,164,0.06); }
+
+    /* ── CTA ── */
+    .cta-btn {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 13px;
+      font-family: 'Crimson Text', serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-align: center;
+      transition: opacity 180ms, transform 180ms;
+    }
+    .cta-btn:hover { opacity: 0.88; transform: scale(1.02); }
+    .cta-de { background: linear-gradient(145deg, #C07828, #A06018); color: #F5EDD5; }
+    .cta-fr { background: linear-gradient(145deg, #2255A4, #1A4490); color: #fff; }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: var(--muted);
+      animation: fadeUp 520ms 240ms ease-out both;
+    }
+    .footer a { color: inherit; text-underline-offset: 3px; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .header, .divider, .lang-card, .footer { animation: none; }
+    }
+    @media (max-width: 640px) {
+      .cards { grid-template-columns: 1fr; }
+      .header { margin-bottom: 28px; }
+      .divider { margin-bottom: 28px; }
+    }
+
+    /* ── SIGN IN ── */
+    .signin-link {
+      position: fixed;
+      top: 22px;
+      right: 24px;
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 20px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(4px);
+      color: var(--ink);
+      text-decoration: none;
+      font-family: 'Crimson Text', serif;
+      font-size: 1rem;
+      font-weight: 600;
+      box-shadow: var(--shadow);
+      transition: transform 180ms, box-shadow 180ms, border-color 180ms;
+    }
+    .signin-link:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: rgba(192,120,40,0.5); }
+    .signin-link span { font-family: 'Caveat', cursive; }
+    @media (max-width: 640px) { .signin-link { top: 14px; right: 14px; padding: 7px 15px; font-size: 0.92rem; } }
+  </style>
+</head>
+<body>
+
+  <a class="signin-link" href="index.html#signin">Sign in <span>→</span></a>
+
+  <header class="header">
+    <p class="eyebrow">✦ Maze Academy</p>
+    <h1 class="main-title">Choose your <em>language</em><br>and start the maze.</h1>
+    <p class="subtitle">Build vocabulary, grammar, and fluency step by step — pick a path and go at your own pace.</p>
+  </header>
+
+  <div class="divider" aria-hidden="true">
+    <div class="diamond"></div>
+    <div class="diamond"></div>
+    <div class="diamond"></div>
+  </div>
+
+  <div class="cards">
+
+    <a class="lang-card" href="index.html#german" aria-label="Start learning German">
+      <div class="flag-strip de" aria-hidden="true">
+        <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+      </div>
+      <div class="card-body">
+        <p class="lang-native">Deutsch</p>
+        <h2 class="lang-name">German</h2>
+        <p class="lang-range">A1 Beginner → C1 Advanced</p>
+        <p class="lang-desc">Navigate the A1–C1 curriculum maze — grammar, vocabulary, and conversation in short, focused rooms.</p>
+        <div class="chips">
+          <span class="chip chip-de">Hallo</span>
+          <span class="chip chip-de">Wie geht's?</span>
+          <span class="chip chip-de">Danke</span>
+          <span class="chip chip-de">Verstehen</span>
+        </div>
+        <span class="cta-btn cta-de">Start learning German →</span>
+      </div>
+    </a>
+
+    <a class="lang-card" href="index.html#french-basics" aria-label="Start learning French">
+      <div class="flag-strip fr" aria-hidden="true">
+        <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+      </div>
+      <div class="card-body">
+        <p class="lang-native">Français</p>
+        <h2 class="lang-name">French</h2>
+        <p class="lang-range">A1 Débutant → C2 Maîtrise</p>
+        <p class="lang-desc">Phonetics, articles, and grammar — work through the French maze from first phrases to near-native fluency.</p>
+        <div class="chips">
+          <span class="chip chip-fr">Bonjour</span>
+          <span class="chip chip-fr">Merci</span>
+          <span class="chip chip-fr">Enchanté</span>
+          <span class="chip chip-fr">Comprendre</span>
+        </div>
+        <span class="cta-btn cta-fr">Explore French →</span>
+      </div>
+    </a>
+
+  </div>
+
+  <p class="footer"><a href="index.html">← Return to the full Maze Academy</a></p>
+
+</body>
+</html>

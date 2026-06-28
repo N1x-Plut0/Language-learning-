@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maze Academy — Choose a Language</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Caveat:wght@500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: 'Crimson Text', serif; overflow-x: hidden; }
+
+    /* ── SPLIT LAYOUT ── */
+    .split {
+      display: flex;
+      min-height: 100dvh;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 64px 52px;
+      text-decoration: none;
+      position: relative;
+      overflow: hidden;
+      transition: flex 460ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .split:has(.panel:hover) .panel:hover      { flex: 1.45; }
+    .split:has(.panel:hover) .panel:not(:hover) { flex: 0.55; }
+
+    /* ── GERMAN PANEL ── */
+    .panel-de {
+      background:
+        radial-gradient(ellipse 80% 60% at 30% 40%, rgba(192,120,40,0.22) 0%, transparent 65%),
+        #1A1510;
+      color: #F5EDD5;
+    }
+    .panel-de::before {
+      content: "DEUTSCH";
+      position: absolute;
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(6rem, 14vw, 11rem);
+      font-weight: 900;
+      font-style: italic;
+      opacity: 0.035;
+      color: #E8B820;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      pointer-events: none;
+      transform: rotate(-8deg) translate(-10%, 20%);
+    }
+
+    /* ── FRENCH PANEL ── */
+    .panel-fr {
+      background:
+        radial-gradient(ellipse 80% 60% at 70% 40%, rgba(0,85,164,0.35) 0%, transparent 65%),
+        #080F1E;
+      color: #EEF2FF;
+    }
+    .panel-fr::before {
+      content: "FRANÇAIS";
+      position: absolute;
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(4.5rem, 11vw, 8.5rem);
+      font-weight: 900;
+      font-style: italic;
+      opacity: 0.035;
+      color: #3A6AB8;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      pointer-events: none;
+      transform: rotate(-8deg) translate(-5%, 20%);
+    }
+
+    /* ── SEAM ── */
+    .seam {
+      width: 1px;
+      background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(255,255,255,0.10) 25%,
+        rgba(255,255,255,0.10) 75%,
+        transparent 100%
+      );
+      position: relative;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .seam-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Caveat', cursive;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      background: #121010;
+      color: rgba(255,255,255,0.28);
+      padding: 10px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      white-space: nowrap;
+    }
+
+    /* ── FLAGS ── */
+    .flag-wrap {
+      margin-bottom: 36px;
+      display: flex;
+      justify-content: center;
+    }
+    .flag {
+      border-radius: 5px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+      opacity: 0.88;
+      display: flex;
+    }
+    .flag-de { flex-direction: column; width: 72px; height: 48px; }
+    .flag-fr { flex-direction: row;    width: 48px; height: 66px; }
+    .flag span { flex: 1; display: block; }
+    .flag-de .s1 { background: #1C1812; }
+    .flag-de .s2 { background: #B83020; }
+    .flag-de .s3 { background: #E8B820; }
+    .flag-fr .s1 { background: #0055A4; }
+    .flag-fr .s2 { background: #FFFFFF; }
+    .flag-fr .s3 { background: #EF4135; }
+
+    /* ── PANEL CONTENT ── */
+    .panel-content {
+      text-align: center;
+      position: relative;
+      z-index: 2;
+      animation: fadeIn 600ms ease-out both;
+    }
+    .panel-de .panel-content { animation-delay: 0ms; }
+    .panel-fr .panel-content { animation-delay: 140ms; }
+
+    .lang-native {
+      font-family: 'Caveat', cursive;
+      font-size: 1.1rem;
+      letter-spacing: 0.16em;
+      opacity: 0.36;
+      margin-bottom: 10px;
+      display: block;
+    }
+    .lang-name {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.8rem, 5vw, 4.5rem);
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 20px;
+    }
+    .lang-tagline {
+      font-size: 1.05rem;
+      opacity: 0.48;
+      max-width: 270px;
+      margin: 0 auto 12px;
+      line-height: 1.56;
+    }
+    .cefr {
+      display: inline-block;
+      margin-bottom: 36px;
+      font-family: 'Caveat', cursive;
+      font-size: 0.82rem;
+      letter-spacing: 0.14em;
+      padding: 5px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+      opacity: 0.45;
+    }
+
+    /* ── PANEL BUTTON ── */
+    .panel-btn {
+      display: inline-block;
+      padding: 15px 42px;
+      border-radius: 12px;
+      font-family: 'Crimson Text', serif;
+      font-size: 1.12rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      border: 1.5px solid rgba(255,255,255,0.20);
+      background: rgba(255,255,255,0.07);
+      color: inherit;
+      transition: background 220ms, border-color 220ms, transform 220ms;
+      cursor: pointer;
+    }
+    .panel-btn:hover {
+      background: rgba(255,255,255,0.13);
+      border-color: rgba(255,255,255,0.38);
+      transform: scale(1.04);
+    }
+    .panel-de:hover .panel-btn {
+      border-color: rgba(232,184,32,0.55);
+      background: rgba(232,184,32,0.10);
+    }
+    .panel-fr:hover .panel-btn {
+      border-color: rgba(58,106,184,0.70);
+      background: rgba(58,106,184,0.16);
+    }
+
+    /* ── TOP BADGE ── */
+    .top-badge {
+      position: fixed;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Caveat', cursive;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.28);
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 680px) {
+      .split { flex-direction: column; }
+      .seam { width: 100%; height: 1px; }
+      .seam-label { top: 50%; left: 50%; }
+      .split:has(.panel:hover) .panel:hover      { flex: 1.25; }
+      .split:has(.panel:hover) .panel:not(:hover) { flex: 0.75; }
+      .panel { padding: 52px 32px; }
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .panel-content { animation: none; }
+      .split:has(.panel:hover) .panel:hover,
+      .split:has(.panel:hover) .panel:not(:hover) { flex: 1; }
+    }
+    /* ── SIGN IN ── */
+    .signin-link {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 20px;
+      border-radius: 999px;
+      border: 1.5px solid rgba(255,255,255,0.22);
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(6px);
+      color: #F5EDD5;
+      text-decoration: none;
+      font-family: 'Crimson Text', serif;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: background 200ms, border-color 200ms, transform 200ms;
+    }
+    .signin-link:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.45); transform: translateY(-2px); }
+    @media (max-width: 680px) { .signin-link { top: 14px; right: 14px; padding: 7px 15px; font-size: 0.92rem; } }
+  </style>
+</head>
+<body>
+
+  <a class="signin-link" href="index.html#signin">Sign in →</a>
+  <p class="top-badge">MAZE ACADEMY</p>
+
+  <div class="split">
+
+    <!-- German Panel -->
+    <a class="panel panel-de" href="index.html#german" aria-label="Start learning German">
+      <div class="panel-content">
+        <div class="flag-wrap">
+          <div class="flag flag-de" aria-hidden="true">
+            <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+          </div>
+        </div>
+        <span class="lang-native">Deutsch</span>
+        <h2 class="lang-name">German</h2>
+        <p class="lang-tagline">Grammar, vocabulary, and conversation — from first words to confident fluency.</p>
+        <p class="cefr">A1 → C1</p>
+        <br>
+        <span class="panel-btn">Start learning →</span>
+      </div>
+    </a>
+
+    <!-- Seam -->
+    <div class="seam" aria-hidden="true">
+      <span class="seam-label">OR</span>
+    </div>
+
+    <!-- French Panel -->
+    <a class="panel panel-fr" href="index.html#french-basics" aria-label="Start learning French">
+      <div class="panel-content">
+        <div class="flag-wrap">
+          <div class="flag flag-fr" aria-hidden="true">
+            <span class="s1"></span><span class="s2"></span><span class="s3"></span>
+          </div>
+        </div>
+        <span class="lang-native">Français</span>
+        <h2 class="lang-name">French</h2>
+        <p class="lang-tagline">Phonetics, articles, and the maze — six CEFR levels from débutant to maîtrise.</p>
+        <p class="cefr">A1 → C2</p>
+        <br>
+        <span class="panel-btn">Explore French →</span>
+      </div>
+    </a>
+
+  </div>
+
+</body>
+</html>
