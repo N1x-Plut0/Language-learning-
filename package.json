@@ -8,6 +8,6 @@
     "node": ">=22.6.0"
   },
   "scripts": {
-    "start": "node --no-warnings server.js"
+    "start": "node --no-warnings --experimental-sqlite server.js"
   }
 }

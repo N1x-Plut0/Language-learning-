@@ -7,7 +7,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install
-    startCommand: node --no-warnings server.js
+    startCommand: node --no-warnings --experimental-sqlite server.js
     envVars:
       - key: NODE_VERSION
         value: "24"
