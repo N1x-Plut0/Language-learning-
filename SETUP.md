@@ -1,48 +1,63 @@
-# Running Maze Academy (with accounts)
+# Setup — accounts for other users (one-time, ~5 minutes)
 
-Everything is built in. There is **no signup, no cloud service, no API keys** — accounts
-and progress are stored in a local database file (`data.db`) created automatically.
+Your site is a static web app. Accounts run on **Supabase** (free, persistent),
+and the site is hosted free on **GitHub Pages** so anyone can use it from one link.
 
-## Start it
-You need [Node.js](https://nodejs.org) (version 22 or newer — you have v24, which is perfect).
+You only do **two things**: create a Supabase project, and paste 2 keys.
+I'll handle the rest once you send me the keys.
 
-1. Open a terminal in this folder.
-2. Run:
+---
 
-   ```
-   node server.js
-   ```
+## Step 1 — Create a free Supabase project
+1. Go to **https://supabase.com** → **Start your project** → sign in (GitHub is easiest).
+2. **New project** → give it a name + a database password → pick a region → **Create**.
+3. Wait ~2 minutes for it to finish setting up.
 
-   (or `npm start`)
+## Step 2 — Create the accounts table
+1. In your project, open **SQL Editor** (left sidebar) → **New query**.
+2. Open the file **`schema.sql`** in this project, copy ALL of it, paste it in, click **Run**.
+3. You should see a `profiles` table under **Table Editor**.
 
-3. Open the address it prints:
+## Step 3 — Make sign-up instant (turn off email confirmation)
+1. Left sidebar: **Authentication** → **Providers** → **Email**.
+2. Turn **"Confirm email" OFF** → **Save**.
+   (Otherwise users must click a confirmation email before logging in.)
 
-   ```
-   http://localhost:3000
-   ```
+## Step 4 — Copy your 2 keys
+1. Left sidebar: **Project Settings** (gear) → **API**.
+2. Copy these two values:
+   - **Project URL**  (looks like `https://abcdxyz.supabase.co`)
+   - **anon public** key  (a long string starting with `eyJ...`)
 
-That's it. The first run creates `data.db` in this folder.
+## Step 5 — Send them to me (or paste them yourself)
+Paste them into **`supabase-config.js`**, replacing the placeholders:
 
-## Using accounts
-- Click **Sign in** (top-right) → **Sign up** → create an account with any email + password (6+ chars).
-- Do some lessons, then reload — your XP, streak, and completed rooms are still there.
-- **Log out** and **log in** again (even in another browser on the same computer) — your
-  progress loads from the database.
-- Not logged in? You can still use everything as a **guest**; progress saves in that browser.
+```js
+const SUPABASE_URL = "https://abcdxyz.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOi...";
+```
 
-## How it works (plain version)
-- `server.js` is a small web server using only Node's built-in modules (no `npm install`).
-- It serves the site **and** provides the accounts API at `/api/*`.
-- Passwords are hashed (scrypt) before storage; you're kept logged in with a secure cookie.
-- All data lives in `data.db` (a real SQLite database). Back it up by copying that file.
+> The anon key is **meant to be public** — it lives in the page. Your data is
+> protected by Row-Level Security (from `schema.sql`).
 
-## Notes
-- Open the site through **http://localhost:3000**, not by double-clicking `index.html`.
-  (Opening the file directly still works in guest mode, but accounts need the server.)
-- To stop the server: press **Ctrl+C** in the terminal.
-- `data.db` contains all accounts/progress — don't delete it unless you want a fresh start.
+That's your whole part. Once the keys are in and pushed to GitHub, the site is live.
 
-### Using it on other devices (optional)
-To reach accounts from your phone or another computer, deploy `server.js` to any host that
-runs Node (Render, Railway, Fly.io, a small VPS…). The code is ready as-is — just run it
-there and point your domain at it.
+---
+
+## The live link (GitHub Pages — automatic)
+This repo has a workflow that publishes the site to GitHub Pages on every push.
+After your first push with the keys filled in, your site is at:
+
+```
+https://n1x-plut0.github.io/Language-learning-/
+```
+
+Share that link — anyone can open it, **sign up, and log in**, and their progress
+is saved to their account on any device. No server to run, nothing to keep open.
+
+(If GitHub Pages isn't on yet: repo **Settings → Pages → Build and deployment →
+Source: GitHub Actions**. The included workflow does the rest.)
+
+## Play locally too
+Double-click **`Play Maze Academy.bat`** (or open `index.html`). Once the keys are
+set, accounts work locally as well, syncing to the same Supabase project.

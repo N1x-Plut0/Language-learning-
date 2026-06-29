@@ -1,50 +1,35 @@
 // ============================================================
-// auth.js — accounts + progress persistence for Maze Academy
+// auth.js — accounts + progress for Maze Academy, via Supabase.
 //
-// Talks to the local backend in server.js (same origin) via /api/*.
-// Depends on app.js exposing window.MazeApp = { getSnapshot, applySnapshot }.
+// Needs (loaded before this file in index.html):
+//   - the Supabase SDK (window.supabase, from CDN)
+//   - supabase-config.js (SUPABASE_URL, SUPABASE_ANON_KEY)
+//   - app.js exposing window.MazeApp = { getSnapshot, applySnapshot }
 //
-// Behaviour:
-//   - Guests: progress saved to localStorage.
-//   - On sign-up / login: local progress merges into the account,
-//     then progress saves to the database (debounced).
-//   - If the backend isn't running (e.g. page opened as a file),
-//     it quietly falls back to guest/local-only mode.
+// Works from a hosted link (GitHub Pages) AND from a local file:
+//   - Guests: progress saved in the browser (localStorage).
+//   - Sign up / log in: local progress merges into the account, then
+//     progress saves to Supabase and follows the user across devices.
+//   - Not configured yet (placeholder keys): clean guest-only mode.
 // ============================================================
 
 (function () {
   "use strict";
 
   const LOCAL_KEY = "maze-progress-v1";
+  const isConfigured =
+    typeof SUPABASE_URL === "string" &&
+    typeof SUPABASE_ANON_KEY === "string" &&
+    !SUPABASE_URL.includes("YOUR-PROJECT") &&
+    !SUPABASE_ANON_KEY.includes("YOUR-ANON-KEY");
 
-  let backendUp = false;
-  let currentUser = null;       // { email } when logged in
-  let isHydrating = false;      // suppress persist while we load data in
+  let supa = null;
+  let currentUser = null;
+  let isHydrating = false;
   let appReady = false;
   let saveTimer = null;
 
-  // ---- API client ------------------------------------------------
-
-  async function api(path, method, body) {
-    const res = await fetch(path, {
-      method: method || "GET",
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      credentials: "same-origin",
-      body: body ? JSON.stringify(body) : undefined
-    });
-    let data = null;
-    try { data = await res.json(); } catch (_) { /* ignore */ }
-    if (!res.ok) {
-      const msg = (data && data.error) ? data.error : `Request failed (${res.status}).`;
-      const err = new Error(msg);
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }
-
   // ---- local storage ---------------------------------------------
-
   function readLocal() {
     try {
       const raw = localStorage.getItem(LOCAL_KEY);
@@ -56,7 +41,6 @@
   }
 
   // ---- merge helpers ---------------------------------------------
-
   function mergeOne(a, b) {
     a = a || {}; b = b || {};
     const completed = new Set([...(a.completed || []), ...(b.completed || [])]);
@@ -79,13 +63,11 @@
     if (!remote) return local;
     return { de: mergeOne(local.de, remote.de), fr: mergeOne(local.fr, remote.fr) };
   }
-
   function isEmptySnap(snap) {
     if (!snap) return true;
     const empty = (s) => !s || (!(s.completed || []).length && !(s.solved || []).length && !s.xp);
     return empty(snap.de) && empty(snap.fr);
   }
-
   function hydrate(snap) {
     if (!snap || !window.MazeApp) return;
     isHydrating = true;
@@ -93,21 +75,31 @@
     finally { isHydrating = false; }
   }
 
-  // ---- remote progress -------------------------------------------
-
+  // ---- Supabase data ---------------------------------------------
   async function fetchRemote() {
-    try {
-      const data = await api("/api/progress", "GET");
-      if (isEmptySnap(data)) return null;
-      return data;
-    } catch (_) { return null; }
+    if (!supa || !currentUser) return null;
+    const { data, error } = await supa
+      .from("profiles")
+      .select("de_progress, fr_progress")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+    if (error || !data) return null;
+    const snap = { de: data.de_progress || {}, fr: data.fr_progress || {} };
+    return isEmptySnap(snap) ? null : snap;
   }
   async function saveRemote(snap) {
-    try { await api("/api/progress", "PUT", snap); } catch (_) { /* offline — keep local copy */ }
+    if (!supa || !currentUser) return;
+    try {
+      await supa.from("profiles").upsert({
+        id: currentUser.id,
+        de_progress: snap.de,
+        fr_progress: snap.fr,
+        updated_at: new Date().toISOString()
+      });
+    } catch (_) { /* offline — local copy kept */ }
   }
 
-  // ---- persistence (called by app.js via window.MazeAuth.persist) -
-
+  // ---- persistence (app.js calls window.MazeAuth.persist) --------
   function persist() {
     if (isHydrating || !appReady || !window.MazeApp) return;
     const snap = window.MazeApp.getSnapshot();
@@ -119,7 +111,6 @@
   window.MazeAuth = { persist };
 
   // ---- auth flows ------------------------------------------------
-
   async function afterLogin() {
     const local = readLocal();
     const remote = await fetchRemote();
@@ -135,23 +126,20 @@
   }
 
   async function doSignup(email, password) {
-    const data = await api("/api/signup", "POST", { email, password });
-    currentUser = { email: data.email };
-    await afterLogin();
+    const { data, error } = await supa.auth.signUp({ email, password });
+    if (error) throw error;
+    if (!data.session) return { needsConfirmation: true };
+    return { needsConfirmation: false };
   }
   async function doLogin(email, password) {
-    const data = await api("/api/login", "POST", { email, password });
-    currentUser = { email: data.email };
-    await afterLogin();
+    const { error } = await supa.auth.signInWithPassword({ email, password });
+    if (error) throw error;
   }
   async function doLogout() {
-    try { await api("/api/logout", "POST"); } catch (_) { /* ignore */ }
-    currentUser = null;
-    updateAccountUI();
+    try { await supa.auth.signOut(); } catch (_) { /* ignore */ }
   }
 
   // ---- UI --------------------------------------------------------
-
   function el(id) { return document.getElementById(id); }
 
   function updateAccountUI() {
@@ -162,11 +150,11 @@
         `<span class="account-email" title="${currentUser.email}">${currentUser.email}</span>` +
         `<button type="button" class="account-btn" id="logout-btn">Log out</button>`;
       el("logout-btn").addEventListener("click", () => doLogout());
-    } else if (backendUp) {
+    } else if (isConfigured) {
       area.innerHTML = `<button type="button" class="account-btn" id="signin-btn">Sign in</button>`;
       el("signin-btn").addEventListener("click", () => openAuthModal("login"));
     } else {
-      area.innerHTML = `<span class="account-note" title="Start the server (node server.js) to enable accounts">Guest mode</span>`;
+      area.innerHTML = `<span class="account-note" title="Add your Supabase keys to supabase-config.js">Guest mode</span>`;
     }
   }
 
@@ -212,8 +200,16 @@
     submit.disabled = true;
     setAuthMessage("Working…");
     try {
-      if (mode === "signup") await doSignup(email, password);
-      else await doLogin(email, password);
+      if (mode === "signup") {
+        const res = await doSignup(email, password);
+        if (res.needsConfirmation) {
+          setAuthMessage("Check your email to confirm your account, then log in.", "ok");
+          setAuthTab("login");
+          return;
+        }
+      } else {
+        await doLogin(email, password);
+      }
       closeAuthModal();
     } catch (err) {
       setAuthMessage(err && err.message ? err.message : "Something went wrong.", "error");
@@ -237,7 +233,6 @@
   }
 
   // ---- bootstrap -------------------------------------------------
-
   function startGuest() {
     const local = readLocal();
     if (local) hydrate(local);
@@ -247,19 +242,16 @@
     appReady = true;
     wireModal();
 
-    // Is the backend reachable? (GET /api/me returns 200 if logged in, 401 if not.)
-    try {
-      const me = await api("/api/me", "GET");
-      backendUp = true;
-      currentUser = me && me.email ? { email: me.email } : null;
-    } catch (err) {
-      if (err.status === 401) {
-        backendUp = true;      // server answered, just not logged in
-        currentUser = null;
-      } else {
-        backendUp = false;     // no server (opened as file, or not started)
-      }
+    if (!isConfigured || !window.supabase) {
+      startGuest();
+      updateAccountUI();
+      return;
     }
+
+    supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const { data: { session } } = await supa.auth.getSession();
+    currentUser = session ? session.user : null;
 
     if (currentUser) {
       await afterLogin();
@@ -268,8 +260,17 @@
       updateAccountUI();
     }
 
-    // Arrived from a "Sign in" link on a title page? Open the login modal.
-    if (backendUp && !currentUser && window.location.hash === "#signin") {
+    supa.auth.onAuthStateChange(async (event, session) => {
+      const prev = currentUser;
+      currentUser = session ? session.user : null;
+      if (event === "SIGNED_IN" && currentUser && (!prev || prev.id !== currentUser.id)) {
+        await afterLogin();
+      } else {
+        updateAccountUI();
+      }
+    });
+
+    if (!currentUser && window.location.hash === "#signin") {
       openAuthModal("login");
     }
   }

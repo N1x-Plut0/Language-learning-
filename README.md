@@ -2,50 +2,50 @@
 
 A German & French language-learning site built as a curriculum "maze" — six CEFR
 levels (A1 → C1/C2), five modules each, ten short practice rooms per module — with
-task questions, module theory, book recommendations, end-of-unit tests, **user
-accounts**, and progress saved to a local database.
+task questions, module theory, book recommendations, end-of-unit tests, and **user
+accounts** so progress follows you across devices.
 
 ## Features
 - 🇩🇪🇫🇷 Two full courses (German & French), each with 600+ practice questions, theory cards, unit tests, and reading lists.
 - 🧩 Interactive curriculum maze with XP, streaks, and per-module progress.
-- 👤 **Accounts**: email + password sign-up/login. Progress is saved to your account and restored on any browser.
-- 🗄️ **Database**: a small, dependency-free Node server with a built-in SQLite database (`data.db`).
-- 🙋 Guest mode: works without an account (progress saved locally), and syncs into your account when you log in.
+- 👤 **Accounts**: email + password sign-up/login, powered by [Supabase](https://supabase.com) (free, persistent).
+- 🙋 Guest mode: works without an account (progress saved in the browser), and syncs into your account when you log in.
+- ☁️ Fully static — hosted free on GitHub Pages, no server to run.
 
-## Use it online (one link)
+## Live link
+Once accounts are configured (see below), the site is published automatically to GitHub Pages:
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/N1x-Plut0/Language-learning-)
+```
+https://n1x-plut0.github.io/Language-learning-/
+```
 
-Click the button → sign in to Render with GitHub → **Apply**. Render reads
-`render.yaml`, builds the server, and gives you a permanent link like
-`https://maze-academy.onrender.com` with **accounts working**. First deploy takes
-~2–3 minutes.
+Anyone can open that link, sign up, and log in — their progress is saved to their account.
 
-> Free-tier note: the service sleeps after ~15 min of inactivity (first visit after
-> that takes ~30s to wake), and the SQLite database can reset on redeploys. Fine for
-> demos; ask for the persistent-database upgrade if you need accounts to last forever.
+## Set up accounts (one-time, ~5 min)
+Accounts use a free Supabase project. You create the project and paste two keys;
+that's it. Full click-by-click steps are in **[SETUP.md](SETUP.md)**:
+1. Create a free Supabase project.
+2. Run `schema.sql` in its SQL Editor.
+3. Turn off email confirmation (for instant sign-up).
+4. Paste your **Project URL** + **anon key** into `supabase-config.js`.
 
-## Run it locally
-Requires [Node.js](https://nodejs.org) 22.6+ (built-in SQLite is used).
-
-- **Windows:** double-click **`Start Maze Academy.bat`** — it starts the server and opens your browser automatically.
-- **Any OS:** run `node server.js`, then open **http://localhost:3000**.
-
-Then click **Sign in → Sign up**. There is no build step and no `npm install` — the server uses only Node's built-in modules.
+## Play locally
+Double-click **`Play Maze Academy.bat`** (or just open `index.html`). The full game
+works offline as a guest; once the Supabase keys are set, accounts work locally too.
 
 ## Project layout
 | File | Purpose |
 |------|---------|
 | `index.html` | The main app (maze, practice, books, account UI). |
 | `app.js` | Course logic, rendering, state. |
-| `auth.js` | Account UI + talks to the `/api/*` backend. |
-| `server.js` | Web server + accounts API + SQLite database. |
+| `auth.js` | Account UI + Supabase auth & progress sync. |
+| `supabase-config.js` | Your Supabase URL + anon key. |
+| `schema.sql` | Database table + security policies (run once in Supabase). |
 | `de-*.js` / `fr-*.js` | Question banks, theory, unit tests, books. |
 | `styles.css` | All styling. |
 | `title-1/2/3.html` | Alternative landing pages. |
-
-See [SETUP.md](SETUP.md) for full setup notes.
+| `.github/workflows/deploy-pages.yml` | Auto-publishes the site to GitHub Pages. |
 
 ## Notes
-- `data.db` (accounts + progress) is **gitignored** — it never gets committed.
-- Passwords are hashed (scrypt); sessions use a secure HttpOnly cookie.
+- The Supabase **anon key is meant to be public** (it lives in the page); your data is protected by Row-Level Security (`schema.sql`).
+- `server.js` is an optional self-hosted alternative backend; it isn't used by the hosted Supabase setup.
