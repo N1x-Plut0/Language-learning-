@@ -5,9 +5,9 @@
   "description": "German & French learning maze with accounts and a local database.",
   "type": "commonjs",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=18"
   },
   "scripts": {
-    "start": "node --no-warnings --experimental-sqlite server.js"
+    "start": "node server.js"
   }
 }

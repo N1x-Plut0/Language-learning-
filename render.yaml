@@ -6,9 +6,7 @@ services:
     env: node
     plan: free
     buildCommand: npm install
-    startCommand: node --no-warnings --experimental-sqlite server.js
+    startCommand: node server.js
     envVars:
-      - key: NODE_VERSION
-        value: "22"           # latest Node 22.x (has built-in node:sqlite)
       - key: NO_OPEN          # don't try to open a browser on the server
         value: "1"

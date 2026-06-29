@@ -3,12 +3,13 @@
 //
 // A tiny, zero-dependency web server (Node's built-ins only) that:
 //   - serves the static site (index.html, app.js, ...)
-//   - provides real accounts + a real SQLite database (data.db)
+//   - provides real accounts, stored in a JSON file (data.json)
 //
 // Run it with:   node server.js     (or: npm start)
 // Then open:     http://localhost:3000
 //
-// No external services, no npm install, no API keys.
+// No external services, no npm install, no API keys, no special Node flags.
+// Runs on any Node 18+.
 // ============================================================
 
 const http = require("node:http");
@@ -16,29 +17,45 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { exec } = require("node:child_process");
-const { DatabaseSync } = require("node:sqlite");
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const DB_PATH = path.join(ROOT, "data.db");
+const DATA_PATH = path.join(ROOT, "data.json");
 
-// ---- database --------------------------------------------------
-const db = new DatabaseSync(DB_PATH);
-db.exec(`
-  create table if not exists users (
-    id integer primary key autoincrement,
-    email text unique not null,
-    pass text not null,
-    de_progress text not null default '{}',
-    fr_progress text not null default '{}',
-    created_at text not null default (datetime('now'))
-  );
-  create table if not exists sessions (
-    token text primary key,
-    user_id integer not null references users(id) on delete cascade,
-    created_at text not null default (datetime('now'))
-  );
-`);
+// ---- storage (a simple JSON file) ------------------------------
+// store = { users: [ {id,email,pass,de_progress,fr_progress,created_at} ],
+//           sessions: { token: userId } }
+let store = { users: [], sessions: {} };
+
+function loadStore() {
+  try {
+    store = JSON.parse(fs.readFileSync(DATA_PATH, "utf8"));
+  } catch (_) {
+    store = { users: [], sessions: {} };
+  }
+  if (!Array.isArray(store.users)) store.users = [];
+  if (!store.sessions || typeof store.sessions !== "object") store.sessions = {};
+}
+
+let saveQueued = false;
+function saveStore() {
+  // debounce rapid writes into one
+  if (saveQueued) return;
+  saveQueued = true;
+  setImmediate(() => {
+    saveQueued = false;
+    try { fs.writeFileSync(DATA_PATH, JSON.stringify(store)); } catch (_) { /* ignore */ }
+  });
+}
+
+loadStore();
+
+function findUserByEmail(email) {
+  return store.users.find((u) => u.email === email) || null;
+}
+function findUserById(id) {
+  return store.users.find((u) => u.id === id) || null;
+}
 
 // ---- password hashing (scrypt) ---------------------------------
 function hashPassword(password) {
@@ -90,20 +107,19 @@ function readBody(req) {
 function userFromReq(req) {
   const token = parseCookies(req).sid;
   if (!token) return null;
-  const row = db.prepare(
-    "select users.* from sessions join users on users.id = sessions.user_id where sessions.token = ?"
-  ).get(token);
-  return row || null;
+  const userId = store.sessions[token];
+  if (userId === undefined) return null;
+  return findUserById(userId);
 }
 
 function makeSession(userId) {
   const token = crypto.randomBytes(32).toString("hex");
-  db.prepare("insert into sessions (token, user_id) values (?, ?)").run(token, userId);
+  store.sessions[token] = userId;
+  saveStore();
   return token;
 }
 
 function sessionCookie(token) {
-  // HttpOnly so JS can't read it; Lax so it rides normal navigation.
   return `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 365}`;
 }
 function clearCookie() {
@@ -121,19 +137,26 @@ async function handleApi(req, res, pathname) {
     const { email, password } = await readBody(req);
     if (!isValidEmail(email)) return send(res, 400, { error: "Please enter a valid email." });
     if (!password || String(password).length < 6) return send(res, 400, { error: "Password must be at least 6 characters." });
-    const existing = db.prepare("select id from users where email = ?").get(email.toLowerCase());
-    if (existing) return send(res, 409, { error: "An account with that email already exists." });
-    const info = db.prepare("insert into users (email, pass) values (?, ?)").run(email.toLowerCase(), hashPassword(password));
-    const token = makeSession(info.lastInsertRowid);
-    return send(res, 200, { email: email.toLowerCase() }, { "Set-Cookie": sessionCookie(token) });
+    const lower = email.toLowerCase();
+    if (findUserByEmail(lower)) return send(res, 409, { error: "An account with that email already exists." });
+    const id = (store.users.reduce((m, u) => Math.max(m, u.id), 0) || 0) + 1;
+    store.users.push({
+      id,
+      email: lower,
+      pass: hashPassword(password),
+      de_progress: {},
+      fr_progress: {},
+      created_at: new Date().toISOString()
+    });
+    saveStore();
+    const token = makeSession(id);
+    return send(res, 200, { email: lower }, { "Set-Cookie": sessionCookie(token) });
   }
 
   // POST /api/login
   if (pathname === "/api/login" && req.method === "POST") {
     const { email, password } = await readBody(req);
-    const user = isValidEmail(email)
-      ? db.prepare("select * from users where email = ?").get(email.toLowerCase())
-      : null;
+    const user = isValidEmail(email) ? findUserByEmail(email.toLowerCase()) : null;
     if (!user || !verifyPassword(password, user.pass)) {
       return send(res, 401, { error: "Wrong email or password." });
     }
@@ -144,7 +167,10 @@ async function handleApi(req, res, pathname) {
   // POST /api/logout
   if (pathname === "/api/logout" && req.method === "POST") {
     const token = parseCookies(req).sid;
-    if (token) db.prepare("delete from sessions where token = ?").run(token);
+    if (token && store.sessions[token] !== undefined) {
+      delete store.sessions[token];
+      saveStore();
+    }
     return send(res, 200, { ok: true }, { "Set-Cookie": clearCookie() });
   }
 
@@ -159,10 +185,7 @@ async function handleApi(req, res, pathname) {
   if (pathname === "/api/progress" && req.method === "GET") {
     const user = userFromReq(req);
     if (!user) return send(res, 401, { error: "Not logged in." });
-    return send(res, 200, {
-      de: JSON.parse(user.de_progress || "{}"),
-      fr: JSON.parse(user.fr_progress || "{}")
-    });
+    return send(res, 200, { de: user.de_progress || {}, fr: user.fr_progress || {} });
   }
 
   // PUT /api/progress
@@ -170,8 +193,9 @@ async function handleApi(req, res, pathname) {
     const user = userFromReq(req);
     if (!user) return send(res, 401, { error: "Not logged in." });
     const { de, fr } = await readBody(req);
-    db.prepare("update users set de_progress = ?, fr_progress = ? where id = ?")
-      .run(JSON.stringify(de || {}), JSON.stringify(fr || {}), user.id);
+    user.de_progress = de || {};
+    user.fr_progress = fr || {};
+    saveStore();
     return send(res, 200, { ok: true });
   }
 
@@ -194,13 +218,13 @@ const TYPES = {
 function serveStatic(req, res, pathname) {
   let rel = decodeURIComponent(pathname);
   if (rel === "/") rel = "/index.html";
-  // prevent path traversal
   const filePath = path.normalize(path.join(ROOT, rel));
   if (!filePath.startsWith(ROOT)) return send(res, 403, { error: "Forbidden" });
-  // never serve the database or the server itself
   const base = path.basename(filePath);
-  if (base === "data.db" || base === "server.js") return send(res, 403, { error: "Forbidden" });
-
+  // never serve the data store or the server itself
+  if (base === "data.json" || base === "data.db" || base === "server.js") {
+    return send(res, 403, { error: "Forbidden" });
+  }
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404, { "Content-Type": "text/plain" });
@@ -239,7 +263,7 @@ server.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`\n  Maze Academy is running.`);
   console.log(`  Open  →  ${url}\n`);
-  console.log(`  (Accounts + progress are stored in data.db in this folder.)`);
+  console.log(`  (Accounts + progress are stored in data.json in this folder.)`);
   console.log(`  Press Ctrl+C to stop.\n`);
-  openBrowser(url); // auto-open the browser so you don't have to type the URL
+  openBrowser(url);
 });

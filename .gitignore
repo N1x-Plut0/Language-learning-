@@ -1,4 +1,5 @@
-# Local database (accounts + progress) — never commit user data
+# Local data store (accounts + progress) — never commit user data
+data.json
 data.db
 data.db-journal
 data.db-wal

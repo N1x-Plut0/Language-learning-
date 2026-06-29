@@ -8,7 +8,7 @@ echo.
 echo   Keep this window open while you use the site.
 echo   Close it (or press Ctrl+C) to stop the server.
 echo.
-node --no-warnings --experimental-sqlite server.js
+node server.js
 echo.
 echo   The server has stopped. Press any key to close this window.
 pause >nul
