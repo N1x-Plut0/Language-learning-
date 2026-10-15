@@ -13,6 +13,8 @@
   <script src="fr-extra.js" defer></script>
   <script src="de-tests.js" defer></script>
   <script src="fr-tests.js" defer></script>
+  <script src="de-plan.js" defer></script>
+  <script src="fr-plan.js" defer></script>
   <script src="app.js" defer></script>
   <script src="auth.js" defer></script>
 </head>
@@ -37,6 +39,7 @@
       <a href="#basics">Basics</a>
       <a href="#practice">Practice</a>
       <a href="#de-books">Books</a>
+      <a href="#de-plan">Lesson Plan</a>
       <a href="#french-basics">French</a>
       <span class="account-area" id="account-area"></span>
     </nav>
@@ -323,6 +326,22 @@
         <p class="lead">Curated picks for every CEFR level — graded readers, textbooks, and online courses.</p>
       </div>
       <div class="books-grid" id="de-books-grid"></div>
+    </section>
+
+    <!-- ── DE LESSON PLAN ───────────────────────────── -->
+    <section class="section-band plan-section" id="de-plan" aria-labelledby="de-plan-title">
+      <div class="section-heading with-tools">
+        <div>
+          <p class="eyebrow">German lesson plan</p>
+          <h2 id="de-plan-title">One lesson for every maze module</h2>
+          <p class="lead">Five lessons per level, each one built on that module's grammar, ten rooms, unit test and reading. Open any lesson in the maze, and your completed rooms are ticked off here.</p>
+        </div>
+        <div class="plan-tools">
+          <div class="level-tabs" id="de-plan-tabs" aria-label="Lesson plan level"></div>
+          <button class="secondary-btn plan-print" type="button" data-plan-print="de">Print plan</button>
+        </div>
+      </div>
+      <div class="plan-list" id="de-plan-list"></div>
     </section>
 
     <div class="lang-divider" aria-hidden="true"><span class="lang-divider-label">Français</span></div>
@@ -642,6 +661,22 @@
         <p class="lead">Curated picks for every CEFR level — graded readers, textbooks, and online courses.</p>
       </div>
       <div class="books-grid" id="fr-books-grid"></div>
+    </section>
+
+    <!-- ── FR LESSON PLAN ───────────────────────────── -->
+    <section class="section-band plan-section" id="fr-plan" aria-labelledby="fr-plan-title">
+      <div class="section-heading with-tools">
+        <div>
+          <p class="eyebrow">French lesson plan</p>
+          <h2 id="fr-plan-title">Plan de cours, module par module</h2>
+          <p class="lead">Five lessons per level, each one built on that module's grammar, ten rooms, unit test and reading. Open any lesson in the maze, and your completed rooms are ticked off here.</p>
+        </div>
+        <div class="plan-tools">
+          <div class="level-tabs" id="fr-plan-tabs" aria-label="Lesson plan level"></div>
+          <button class="secondary-btn plan-print" type="button" data-plan-print="fr">Print plan</button>
+        </div>
+      </div>
+      <div class="plan-list" id="fr-plan-list"></div>
     </section>
 
     <!-- ── UNIT TEST MODAL ───────────────────────────── -->

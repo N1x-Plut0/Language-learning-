@@ -231,6 +231,7 @@ function init() {
   initUnitTest();
   initFrReveal();
   frInit();
+  initLessonPlans();
 
   window.MazeApp = { getSnapshot, applySnapshot };
   window.dispatchEvent(new Event("maze-ready"));
@@ -393,6 +394,7 @@ function renderTask() {
   }
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
   renderActivity(task);
+  renderLessonPlan("de");
   notifyProgressChange();
 }
 
@@ -830,6 +832,7 @@ function frRenderTask() {
   const frBtn = document.getElementById("fr-unit-test-btn");
   if (frBtn) frBtn.hidden = pct !== 100;
   frRenderActivity(task);
+  renderLessonPlan("fr");
   notifyProgressChange();
 }
 
@@ -1012,6 +1015,161 @@ function renderBookGrid(gridId, books) {
 function renderBooks() {
   if (typeof deBooks !== "undefined") renderBookGrid("de-books-grid", deBooks);
   if (typeof frBooks !== "undefined") renderBookGrid("fr-books-grid", frBooks);
+}
+
+// ─── LESSON PLANS ────────────────────────────────────────────────
+// One lesson per maze module. Grammar, rooms and books come from the course
+// data; goals, vocabulary and activities come from de-plan.js / fr-plan.js.
+const planView = { de: { level: null, open: new Set() }, fr: { level: null, open: new Set() } };
+
+function planSource(lang) {
+  return lang === "fr"
+    ? { plan: typeof frLessonPlan !== "undefined" ? frLessonPlan : null, levels: frLevels, curriculum: frCurriculum,
+        st: frState, theory: typeof frModuleTheory !== "undefined" ? frModuleTheory : {}, books: typeof frBooks !== "undefined" ? frBooks : [] }
+    : { plan: typeof deLessonPlan !== "undefined" ? deLessonPlan : null, levels, curriculum,
+        st: state, theory: typeof deModuleTheory !== "undefined" ? deModuleTheory : {}, books: typeof deBooks !== "undefined" ? deBooks : [] };
+}
+
+function renderLessonPlan(lang) {
+  const tabs = document.getElementById(`${lang}-plan-tabs`);
+  const list = document.getElementById(`${lang}-plan-list`);
+  const src = planSource(lang);
+  if (!tabs || !list || !src.plan) return;
+  const view = planView[lang];
+  const level = view.level || src.st.level;
+
+  tabs.innerHTML = src.levels.map((l) => `
+    <button class="level-tab ${l.id === level ? "active" : ""}" type="button" data-plan-level="${l.id}">${l.id}</button>
+  `).join("");
+
+  const levelInfo = src.levels.find((l) => l.id === level);
+  const book = src.books.find((b) => b.level === level);
+  list.innerHTML = (src.plan[level] || []).map((lesson, index) => {
+    const module = src.curriculum[level][index];
+    const theory = (src.theory[level] || [])[index] || { title: module.title, rules: [], examples: [], keyPattern: "" };
+    const done = module.tasks.filter((t) => src.st.completed.has(t.id)).length;
+    const pct = Math.round((done / module.tasks.length) * 100);
+    const current = src.st.level === level && src.st.module === index;
+    return `
+      <details class="plan-card ${current ? "current" : ""}" data-plan-index="${index}" ${view.open.has(`${level}-${index}`) ? "open" : ""}
+        style="--module-a: ${module.a}; --module-b: ${module.b};">
+        <summary class="plan-summary">
+          <span class="plan-num">${level} · Lesson ${index + 1}</span>
+          <span class="plan-title">${theory.title}</span>
+          <span class="plan-meta">${module.title} · ${lesson.minutes} min</span>
+          <span class="plan-progress" aria-label="${done} of ${module.tasks.length} rooms complete">
+            <span class="plan-progress-bar"><span style="width:${pct}%"></span></span>${pct}%
+          </span>
+        </summary>
+        <div class="plan-body">
+          <div class="plan-block">
+            <h4>Goals</h4>
+            <ul>${lesson.goals.map((g) => `<li>${g}</li>`).join("")}</ul>
+          </div>
+          <div class="plan-block">
+            <h4>1 · Warm-up</h4>
+            <p>${lesson.warmup}</p>
+          </div>
+          <div class="plan-block plan-wide">
+            <h4>2 · Grammar focus</h4>
+            <ul>${theory.rules.map((r) => `<li>${r}</li>`).join("")}</ul>
+            ${theory.keyPattern ? `<p class="plan-pattern"><strong>Key pattern:</strong> ${theory.keyPattern}</p>` : ""}
+            ${theory.examples.length ? `<table class="theory-examples">${theory.examples.map((ex) => `<tr><td>${ex.src}</td><td>${ex.tr}</td></tr>`).join("")}</table>` : ""}
+          </div>
+          <div class="plan-block">
+            <h4>3 · Vocabulary</h4>
+            <dl class="plan-vocab">${lesson.vocab.map(([w, m]) => `<dt>${w}</dt><dd>${m}</dd>`).join("")}</dl>
+          </div>
+          <div class="plan-block">
+            <h4>4 · Maze rooms (${done}/${module.tasks.length})</h4>
+            <ol class="plan-rooms">${module.tasks.map((t) => `
+              <li class="${src.st.completed.has(t.id) ? "done" : ""}"><span>${t.title}</span><em>${t.skill}</em></li>`).join("")}
+            </ol>
+          </div>
+          <div class="plan-block">
+            <h4>5 · Speaking</h4>
+            <p>${lesson.speaking}</p>
+          </div>
+          <div class="plan-block">
+            <h4>6 · Writing</h4>
+            <p>${lesson.writing}</p>
+          </div>
+          <div class="plan-block">
+            <h4>7 · Check</h4>
+            <p>Unit test: 10 questions on this module. It unlocks when all 10 rooms are complete.</p>
+            ${book ? `<p><strong>Reading:</strong> ${book.title} (${book.author})</p>` : ""}
+          </div>
+          <div class="plan-block">
+            <h4>Homework</h4>
+            <p>${lesson.homework}</p>
+          </div>
+          <div class="plan-actions">
+            <button class="primary-btn" type="button" data-plan-open="${index}">Open in Maze →</button>
+            <span class="plan-level-name">${levelInfo ? `${levelInfo.id} ${levelInfo.name}` : level} · ${module.focus}</span>
+          </div>
+        </div>
+      </details>
+    `;
+  }).join("");
+}
+
+function openPlanModule(lang, level, index) {
+  if (lang === "fr") {
+    frState.level = level;
+    frState.module = index;
+    frState.task = 0;
+    frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask();
+  } else {
+    state.level = level;
+    state.module = index;
+    state.task = 0;
+    renderLevelTabs(); renderModules(); renderMaze(); renderTask();
+  }
+  const target = document.getElementById(lang === "fr" ? "fr-curriculum" : "curriculum");
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function printLessonPlan(lang) {
+  const list = document.getElementById(`${lang}-plan-list`);
+  if (!list) return;
+  const wasOpen = [...list.querySelectorAll("details")].map((d) => d.open);
+  list.querySelectorAll("details").forEach((d) => { d.open = true; });
+  document.body.dataset.printPlan = lang;
+  window.addEventListener("afterprint", () => {
+    delete document.body.dataset.printPlan;
+    list.querySelectorAll("details").forEach((d, i) => { d.open = wasOpen[i]; });
+  }, { once: true });
+  window.print();
+}
+
+function initLessonPlans() {
+  ["de", "fr"].forEach((lang) => {
+    const tabs = document.getElementById(`${lang}-plan-tabs`);
+    const list = document.getElementById(`${lang}-plan-list`);
+    if (!tabs || !list) return;
+    const view = planView[lang];
+    tabs.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-plan-level]");
+      if (!btn) return;
+      view.level = btn.dataset.planLevel;
+      renderLessonPlan(lang);
+    });
+    list.addEventListener("toggle", (e) => {
+      const card = e.target.closest(".plan-card");
+      if (!card) return;
+      const key = `${view.level || planSource(lang).st.level}-${card.dataset.planIndex}`;
+      if (card.open) view.open.add(key); else view.open.delete(key);
+    }, true);
+    list.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-plan-open]");
+      if (!btn) return;
+      openPlanModule(lang, view.level || planSource(lang).st.level, Number(btn.dataset.planOpen));
+    });
+    renderLessonPlan(lang);
+  });
+  document.querySelectorAll("[data-plan-print]").forEach((btn) => {
+    btn.addEventListener("click", () => printLessonPlan(btn.dataset.planPrint));
+  });
 }
 
 // ─── UNIT TEST MODAL ──────────────────────────────────────────────
