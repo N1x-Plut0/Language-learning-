@@ -20,6 +20,11 @@ Once accounts are configured (see below), the site is published automatically to
 https://n1x-plut0.github.io/Language-learning-/
 ```
 
+Each language has its own page:
+
+- German: `https://n1x-plut0.github.io/Language-learning-/german/`
+- French: `https://n1x-plut0.github.io/Language-learning-/french/`
+
 Anyone can open that link, sign up, and log in — their progress is saved to their account.
 
 ## Set up accounts (one-time, ~5 min)
@@ -37,7 +42,9 @@ works offline as a guest; once the Supabase keys are set, accounts work locally 
 ## Project layout
 | File | Purpose |
 |------|---------|
-| `index.html` | The main app (maze, practice, books, account UI). |
+| `index.html` | Home page: pick a language, see your progress in each course. |
+| `german/index.html` | German course page: next lesson, lesson plan, maze, practice, placement, basics, books. |
+| `french/index.html` | French course page (same layout as German). |
 | `app.js` | Course logic, rendering, state. |
 | `auth.js` | Account UI + Supabase auth & progress sync. |
 | `supabase-config.js` | Your Supabase URL + anon key. |

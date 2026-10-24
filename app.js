@@ -221,17 +221,20 @@ function init() {
     els[toCamel(id)] = document.getElementById(id);
   });
 
-  renderQuestions();
-  renderLevelTabs();
-  renderModules();
-  renderMaze();
-  renderTask();
-  bindEvents();
+  if (els.questions) {
+    renderQuestions();
+    renderLevelTabs();
+    renderModules();
+    renderMaze();
+    renderTask();
+    bindEvents();
+  }
   renderBooks();
   initUnitTest();
   initFrReveal();
   frInit();
   initLessonPlans();
+  renderLanding();
 
   window.MazeApp = { getSnapshot, applySnapshot };
   window.dispatchEvent(new Event("maze-ready"));
@@ -274,17 +277,20 @@ function applySnapshot(snap) {
   hydrateOne(state, snap.de);
   hydrateOne(frState, snap.fr);
 
-  renderLevelTabs();
-  renderModules();
-  renderMaze();
-  renderTask();
+  if (els.levelTabs) {
+    renderLevelTabs();
+    renderModules();
+    renderMaze();
+    renderTask();
+  }
 
-  if (typeof frRenderLevelTabs === "function" && frEls.levelTabs) {
+  if (frEls.levelTabs) {
     frRenderLevelTabs();
     frRenderModules();
     frRenderMaze();
     frRenderTask();
   }
+  renderLanding();
 }
 
 // Notify the account layer that saved data changed (no-op until auth.js loads).
@@ -395,6 +401,7 @@ function renderTask() {
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
   renderActivity(task);
   renderLessonPlan("de");
+  renderNextLesson("de");
   notifyProgressChange();
 }
 
@@ -826,6 +833,8 @@ function frRenderTask() {
   frEls.xpCount.textContent = frState.xp;
   frEls.streakCount.textContent = frState.streak;
   frEls.lessonReward.textContent = `+${frGetReward()} XP`;
+  if (frEls.currentLevel) frEls.currentLevel.textContent = frState.level;
+  if (frEls.selectedModuleLabel) frEls.selectedModuleLabel.textContent = `Module ${module.number}`;
   if (typeof frModuleTheory !== "undefined") {
     renderTheory(frModuleTheory, frState.level, frState.module, frEls.theoryModuleTitle, frEls.theoryBody);
   }
@@ -833,6 +842,7 @@ function frRenderTask() {
   if (frBtn) frBtn.hidden = pct !== 100;
   frRenderActivity(task);
   renderLessonPlan("fr");
+  renderNextLesson("fr");
   notifyProgressChange();
 }
 
@@ -875,6 +885,17 @@ function frCheckAnswer(answerIndex) {
 }
 
 function frBindEvents() {
+  document.querySelectorAll("[data-fr-duration]").forEach((button) => {
+    button.addEventListener("click", () => {
+      frState.duration = Number(button.dataset.frDuration);
+      document.querySelectorAll("[data-fr-duration]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+        item.setAttribute("aria-pressed", item === button ? "true" : "false");
+      });
+      frRenderTask();
+    });
+  });
+
   if (frEls.placementForm) {
     frEls.placementForm.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -978,7 +999,7 @@ function frInit() {
     "fr-progress-ring", "fr-progress-value", "fr-progress-copy",
     "fr-streak-count", "fr-xp-count", "fr-lesson-prompt", "fr-lesson-options",
     "fr-lesson-feedback", "fr-lesson-reward", "fr-questions",
-    "fr-theory-module-title", "fr-theory-body"
+    "fr-theory-module-title", "fr-theory-body", "fr-current-level", "fr-selected-module-label"
   ].forEach((id) => { frEls[toCamel(id.slice(3))] = document.getElementById(id); });
 
   frRenderQuestions();
@@ -1104,7 +1125,8 @@ function renderLessonPlan(lang) {
             <p>${lesson.homework}</p>
           </div>
           <div class="plan-actions">
-            <button class="primary-btn" type="button" data-plan-open="${index}">Open in Maze →</button>
+            <button class="primary-btn" type="button" data-plan-start="${index}">${done === module.tasks.length ? "Review lesson" : done ? "Continue lesson" : "Start lesson"} →</button>
+            <button class="secondary-btn" type="button" data-plan-open="${index}">Show in maze</button>
             <span class="plan-level-name">${levelInfo ? `${levelInfo.id} ${levelInfo.name}` : level} · ${module.focus}</span>
           </div>
         </div>
@@ -1127,6 +1149,105 @@ function openPlanModule(lang, level, index) {
   }
   const target = document.getElementById(lang === "fr" ? "fr-curriculum" : "curriculum");
   if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// The lesson to work on next: the first unfinished module at the learner's
+// level, else the first module of the next level.
+function findNextLesson(lang) {
+  const src = planSource(lang);
+  const ids = src.levels.map((l) => l.id);
+  for (let li = Math.max(0, ids.indexOf(src.st.level)); li < ids.length; li += 1) {
+    const modules = src.curriculum[ids[li]];
+    const index = modules.findIndex((m) => m.tasks.some((t) => !src.st.completed.has(t.id)));
+    if (index !== -1) return { level: ids[li], index };
+  }
+  return null;
+}
+
+function lessonSummary(lang, level, index) {
+  const src = planSource(lang);
+  const module = src.curriculum[level][index];
+  const theory = (src.theory[level] || [])[index];
+  const lesson = src.plan && src.plan[level] ? src.plan[level][index] : null;
+  const done = module.tasks.filter((t) => src.st.completed.has(t.id)).length;
+  return {
+    module, lesson, done,
+    total: module.tasks.length,
+    pct: Math.round((done / module.tasks.length) * 100),
+    title: theory ? theory.title : module.title,
+    levelInfo: src.levels.find((l) => l.id === level)
+  };
+}
+
+function startLesson(lang, level, index) {
+  const st = planSource(lang).st;
+  const module = planSource(lang).curriculum[level][index];
+  const firstOpen = module.tasks.findIndex((t) => !st.completed.has(t.id));
+  st.level = level;
+  st.module = index;
+  st.task = firstOpen === -1 ? 0 : firstOpen;
+  if (lang === "fr") { frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask(); }
+  else { renderLevelTabs(); renderModules(); renderMaze(); renderTask(); }
+  const target = document.getElementById(lang === "fr" ? "fr-practice" : "practice");
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderNextLesson(lang) {
+  const box = document.getElementById(`${lang}-next`);
+  const practiceLine = document.getElementById(`${lang}-practice-lesson`);
+  const src = planSource(lang);
+  if (practiceLine) {
+    const cur = lessonSummary(lang, src.st.level, src.st.module);
+    practiceLine.innerHTML = `Lesson ${src.st.module + 1} of 5: <strong>${cur.title}</strong> · ${cur.done}/${cur.total} rooms · <a href="#${lang}-plan">see lesson plan</a>`;
+  }
+  if (!box) return;
+  const next = findNextLesson(lang);
+  const placementId = lang === "fr" ? "fr-placement" : "placement";
+  if (!next) {
+    box.innerHTML = `<div class="next-card"><h3>Course complete!</h3><p>You have finished every room. Review any lesson in the plan below.</p></div>`;
+    return;
+  }
+  const info = lessonSummary(lang, next.level, next.index);
+  const fresh = src.st.completed.size === 0;
+  box.innerHTML = `
+    <article class="next-card" style="--module-a: ${info.module.a};">
+      <div class="next-main">
+        <p class="next-kicker">${next.level} ${info.levelInfo ? info.levelInfo.name : ""} · Lesson ${next.index + 1} of 5${info.lesson ? ` · ${info.lesson.minutes} min` : ""}</p>
+        <h3>${info.title}</h3>
+        ${info.lesson ? `<ul class="next-goals">${info.lesson.goals.map((g) => `<li>${g}</li>`).join("")}</ul>` : ""}
+        <div class="next-actions">
+          <button class="primary-btn" type="button" data-next-start>${info.done ? "Continue lesson" : "Start lesson"} →</button>
+          <a class="secondary-btn" href="#${lang}-plan" data-next-plan>Read the lesson plan</a>
+        </div>
+        ${fresh ? `<p class="next-hint">Not a beginner? <a href="#${placementId}">Take the placement check</a> to start at your level.</p>` : ""}
+      </div>
+      <div class="next-side">
+        <div class="ring next-ring" style="--progress: ${info.pct};"><span>${info.pct}%</span></div>
+        <p>${info.done} of ${info.total} rooms done</p>
+      </div>
+    </article>
+  `;
+  box.querySelector("[data-next-start]").addEventListener("click", () => startLesson(lang, next.level, next.index));
+  box.querySelector("[data-next-plan]").addEventListener("click", () => {
+    planView[lang].level = next.level;
+    planView[lang].open.add(`${next.level}-${next.index}`);
+    renderLessonPlan(lang);
+  });
+}
+
+// Home page: show where each course stands on the language cards.
+function renderLanding() {
+  ["de", "fr"].forEach((lang) => {
+    const el = document.getElementById(`${lang}-card-progress`);
+    if (!el) return;
+    const st = planSource(lang).st;
+    const next = findNextLesson(lang);
+    if (!next) { el.textContent = "Course complete"; return; }
+    const info = lessonSummary(lang, next.level, next.index);
+    el.textContent = st.completed.size
+      ? `Next: ${next.level} · Lesson ${next.index + 1} · ${info.title} (${info.pct}%)`
+      : `Start with ${next.level} · Lesson 1 · ${info.title}`;
+  });
 }
 
 function printLessonPlan(lang) {
@@ -1161,9 +1282,12 @@ function initLessonPlans() {
       if (card.open) view.open.add(key); else view.open.delete(key);
     }, true);
     list.addEventListener("click", (e) => {
+      const level = view.level || planSource(lang).st.level;
+      const start = e.target.closest("[data-plan-start]");
+      if (start) { startLesson(lang, level, Number(start.dataset.planStart)); return; }
       const btn = e.target.closest("[data-plan-open]");
       if (!btn) return;
-      openPlanModule(lang, view.level || planSource(lang).st.level, Number(btn.dataset.planOpen));
+      openPlanModule(lang, level, Number(btn.dataset.planOpen));
     });
     renderLessonPlan(lang);
   });

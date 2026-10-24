@@ -217,7 +217,7 @@ const TYPES = {
 
 function serveStatic(req, res, pathname) {
   let rel = decodeURIComponent(pathname);
-  if (rel === "/") rel = "/index.html";
+  if (rel.endsWith("/")) rel += "index.html";
   const filePath = path.normalize(path.join(ROOT, rel));
   if (!filePath.startsWith(ROOT)) return send(res, 403, { error: "Forbidden" });
   const base = path.basename(filePath);
