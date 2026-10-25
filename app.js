@@ -221,16 +221,20 @@ function init() {
     els[toCamel(id)] = document.getElementById(id);
   });
 
-  renderQuestions();
-  renderLevelTabs();
-  renderModules();
-  renderMaze();
-  renderTask();
-  bindEvents();
+  if (els.questions) {
+    renderQuestions();
+    renderLevelTabs();
+    renderModules();
+    renderMaze();
+    renderTask();
+    bindEvents();
+  }
   renderBooks();
   initUnitTest();
   initFrReveal();
   frInit();
+  initLessonPlans();
+  renderLanding();
 
   window.MazeApp = { getSnapshot, applySnapshot };
   window.dispatchEvent(new Event("maze-ready"));
@@ -273,17 +277,20 @@ function applySnapshot(snap) {
   hydrateOne(state, snap.de);
   hydrateOne(frState, snap.fr);
 
-  renderLevelTabs();
-  renderModules();
-  renderMaze();
-  renderTask();
+  if (els.levelTabs) {
+    renderLevelTabs();
+    renderModules();
+    renderMaze();
+    renderTask();
+  }
 
-  if (typeof frRenderLevelTabs === "function" && frEls.levelTabs) {
+  if (frEls.levelTabs) {
     frRenderLevelTabs();
     frRenderModules();
     frRenderMaze();
     frRenderTask();
   }
+  renderLanding();
 }
 
 // Notify the account layer that saved data changed (no-op until auth.js loads).
@@ -393,6 +400,8 @@ function renderTask() {
   }
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
   renderActivity(task);
+  renderLessonPlan("de");
+  renderNextLesson("de");
   notifyProgressChange();
 }
 
@@ -824,12 +833,16 @@ function frRenderTask() {
   frEls.xpCount.textContent = frState.xp;
   frEls.streakCount.textContent = frState.streak;
   frEls.lessonReward.textContent = `+${frGetReward()} XP`;
+  if (frEls.currentLevel) frEls.currentLevel.textContent = frState.level;
+  if (frEls.selectedModuleLabel) frEls.selectedModuleLabel.textContent = `Module ${module.number}`;
   if (typeof frModuleTheory !== "undefined") {
     renderTheory(frModuleTheory, frState.level, frState.module, frEls.theoryModuleTitle, frEls.theoryBody);
   }
   const frBtn = document.getElementById("fr-unit-test-btn");
   if (frBtn) frBtn.hidden = pct !== 100;
   frRenderActivity(task);
+  renderLessonPlan("fr");
+  renderNextLesson("fr");
   notifyProgressChange();
 }
 
@@ -872,6 +885,17 @@ function frCheckAnswer(answerIndex) {
 }
 
 function frBindEvents() {
+  document.querySelectorAll("[data-fr-duration]").forEach((button) => {
+    button.addEventListener("click", () => {
+      frState.duration = Number(button.dataset.frDuration);
+      document.querySelectorAll("[data-fr-duration]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+        item.setAttribute("aria-pressed", item === button ? "true" : "false");
+      });
+      frRenderTask();
+    });
+  });
+
   if (frEls.placementForm) {
     frEls.placementForm.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -975,7 +999,7 @@ function frInit() {
     "fr-progress-ring", "fr-progress-value", "fr-progress-copy",
     "fr-streak-count", "fr-xp-count", "fr-lesson-prompt", "fr-lesson-options",
     "fr-lesson-feedback", "fr-lesson-reward", "fr-questions",
-    "fr-theory-module-title", "fr-theory-body"
+    "fr-theory-module-title", "fr-theory-body", "fr-current-level", "fr-selected-module-label"
   ].forEach((id) => { frEls[toCamel(id.slice(3))] = document.getElementById(id); });
 
   frRenderQuestions();
@@ -1012,6 +1036,264 @@ function renderBookGrid(gridId, books) {
 function renderBooks() {
   if (typeof deBooks !== "undefined") renderBookGrid("de-books-grid", deBooks);
   if (typeof frBooks !== "undefined") renderBookGrid("fr-books-grid", frBooks);
+}
+
+// ─── LESSON PLANS ────────────────────────────────────────────────
+// One lesson per maze module. Grammar, rooms and books come from the course
+// data; goals, vocabulary and activities come from de-plan.js / fr-plan.js.
+const planView = { de: { level: null, open: new Set() }, fr: { level: null, open: new Set() } };
+
+function planSource(lang) {
+  return lang === "fr"
+    ? { plan: typeof frLessonPlan !== "undefined" ? frLessonPlan : null, levels: frLevels, curriculum: frCurriculum,
+        st: frState, theory: typeof frModuleTheory !== "undefined" ? frModuleTheory : {}, books: typeof frBooks !== "undefined" ? frBooks : [] }
+    : { plan: typeof deLessonPlan !== "undefined" ? deLessonPlan : null, levels, curriculum,
+        st: state, theory: typeof deModuleTheory !== "undefined" ? deModuleTheory : {}, books: typeof deBooks !== "undefined" ? deBooks : [] };
+}
+
+function renderLessonPlan(lang) {
+  const tabs = document.getElementById(`${lang}-plan-tabs`);
+  const list = document.getElementById(`${lang}-plan-list`);
+  const src = planSource(lang);
+  if (!tabs || !list || !src.plan) return;
+  const view = planView[lang];
+  const level = view.level || src.st.level;
+
+  tabs.innerHTML = src.levels.map((l) => `
+    <button class="level-tab ${l.id === level ? "active" : ""}" type="button" data-plan-level="${l.id}">${l.id}</button>
+  `).join("");
+
+  const levelInfo = src.levels.find((l) => l.id === level);
+  const book = src.books.find((b) => b.level === level);
+  list.innerHTML = (src.plan[level] || []).map((lesson, index) => {
+    const module = src.curriculum[level][index];
+    const theory = (src.theory[level] || [])[index] || { title: module.title, rules: [], examples: [], keyPattern: "" };
+    const done = module.tasks.filter((t) => src.st.completed.has(t.id)).length;
+    const pct = Math.round((done / module.tasks.length) * 100);
+    const current = src.st.level === level && src.st.module === index;
+    return `
+      <details class="plan-card ${current ? "current" : ""}" data-plan-index="${index}" ${view.open.has(`${level}-${index}`) ? "open" : ""}
+        style="--module-a: ${module.a}; --module-b: ${module.b};">
+        <summary class="plan-summary">
+          <span class="plan-num">${level} · Lesson ${index + 1}</span>
+          <span class="plan-title">${theory.title}</span>
+          <span class="plan-meta">${module.title} · ${lesson.minutes} min</span>
+          <span class="plan-progress" aria-label="${done} of ${module.tasks.length} rooms complete">
+            <span class="plan-progress-bar"><span style="width:${pct}%"></span></span>${pct}%
+          </span>
+        </summary>
+        <div class="plan-body">
+          <div class="plan-block">
+            <h4>Goals</h4>
+            <ul>${lesson.goals.map((g) => `<li>${g}</li>`).join("")}</ul>
+          </div>
+          <div class="plan-block">
+            <h4>1 · Warm-up</h4>
+            <p>${lesson.warmup}</p>
+          </div>
+          <div class="plan-block plan-wide">
+            <h4>2 · Grammar focus</h4>
+            <ul>${theory.rules.map((r) => `<li>${r}</li>`).join("")}</ul>
+            ${theory.keyPattern ? `<p class="plan-pattern"><strong>Key pattern:</strong> ${theory.keyPattern}</p>` : ""}
+            ${theory.examples.length ? `<table class="theory-examples">${theory.examples.map((ex) => `<tr><td>${ex.src}</td><td>${ex.tr}</td></tr>`).join("")}</table>` : ""}
+          </div>
+          <div class="plan-block">
+            <h4>3 · Vocabulary</h4>
+            <dl class="plan-vocab">${lesson.vocab.map(([w, m]) => `<dt>${w}</dt><dd>${m}</dd>`).join("")}</dl>
+          </div>
+          <div class="plan-block">
+            <h4>4 · Maze rooms (${done}/${module.tasks.length})</h4>
+            <ol class="plan-rooms">${module.tasks.map((t) => `
+              <li class="${src.st.completed.has(t.id) ? "done" : ""}"><span>${t.title}</span><em>${t.skill}</em></li>`).join("")}
+            </ol>
+          </div>
+          <div class="plan-block">
+            <h4>5 · Speaking</h4>
+            <p>${lesson.speaking}</p>
+          </div>
+          <div class="plan-block">
+            <h4>6 · Writing</h4>
+            <p>${lesson.writing}</p>
+          </div>
+          <div class="plan-block">
+            <h4>7 · Check</h4>
+            <p>Unit test: 10 questions on this module. It unlocks when all 10 rooms are complete.</p>
+            ${book ? `<p><strong>Reading:</strong> ${book.title} (${book.author})</p>` : ""}
+          </div>
+          <div class="plan-block">
+            <h4>Homework</h4>
+            <p>${lesson.homework}</p>
+          </div>
+          <div class="plan-actions">
+            <button class="primary-btn" type="button" data-plan-start="${index}">${done === module.tasks.length ? "Review lesson" : done ? "Continue lesson" : "Start lesson"} →</button>
+            <button class="secondary-btn" type="button" data-plan-open="${index}">Show in maze</button>
+            <span class="plan-level-name">${levelInfo ? `${levelInfo.id} ${levelInfo.name}` : level} · ${module.focus}</span>
+          </div>
+        </div>
+      </details>
+    `;
+  }).join("");
+}
+
+function openPlanModule(lang, level, index) {
+  if (lang === "fr") {
+    frState.level = level;
+    frState.module = index;
+    frState.task = 0;
+    frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask();
+  } else {
+    state.level = level;
+    state.module = index;
+    state.task = 0;
+    renderLevelTabs(); renderModules(); renderMaze(); renderTask();
+  }
+  const target = document.getElementById(lang === "fr" ? "fr-curriculum" : "curriculum");
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// The lesson to work on next: the first unfinished module at the learner's
+// level, else the first module of the next level.
+function findNextLesson(lang) {
+  const src = planSource(lang);
+  const ids = src.levels.map((l) => l.id);
+  for (let li = Math.max(0, ids.indexOf(src.st.level)); li < ids.length; li += 1) {
+    const modules = src.curriculum[ids[li]];
+    const index = modules.findIndex((m) => m.tasks.some((t) => !src.st.completed.has(t.id)));
+    if (index !== -1) return { level: ids[li], index };
+  }
+  return null;
+}
+
+function lessonSummary(lang, level, index) {
+  const src = planSource(lang);
+  const module = src.curriculum[level][index];
+  const theory = (src.theory[level] || [])[index];
+  const lesson = src.plan && src.plan[level] ? src.plan[level][index] : null;
+  const done = module.tasks.filter((t) => src.st.completed.has(t.id)).length;
+  return {
+    module, lesson, done,
+    total: module.tasks.length,
+    pct: Math.round((done / module.tasks.length) * 100),
+    title: theory ? theory.title : module.title,
+    levelInfo: src.levels.find((l) => l.id === level)
+  };
+}
+
+function startLesson(lang, level, index) {
+  const st = planSource(lang).st;
+  const module = planSource(lang).curriculum[level][index];
+  const firstOpen = module.tasks.findIndex((t) => !st.completed.has(t.id));
+  st.level = level;
+  st.module = index;
+  st.task = firstOpen === -1 ? 0 : firstOpen;
+  if (lang === "fr") { frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask(); }
+  else { renderLevelTabs(); renderModules(); renderMaze(); renderTask(); }
+  const target = document.getElementById(lang === "fr" ? "fr-practice" : "practice");
+  if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderNextLesson(lang) {
+  const box = document.getElementById(`${lang}-next`);
+  const practiceLine = document.getElementById(`${lang}-practice-lesson`);
+  const src = planSource(lang);
+  if (practiceLine) {
+    const cur = lessonSummary(lang, src.st.level, src.st.module);
+    practiceLine.innerHTML = `Lesson ${src.st.module + 1} of 5: <strong>${cur.title}</strong> · ${cur.done}/${cur.total} rooms · <a href="#${lang}-plan">see lesson plan</a>`;
+  }
+  if (!box) return;
+  const next = findNextLesson(lang);
+  const placementId = lang === "fr" ? "fr-placement" : "placement";
+  if (!next) {
+    box.innerHTML = `<div class="next-card"><h3>Course complete!</h3><p>You have finished every room. Review any lesson in the plan below.</p></div>`;
+    return;
+  }
+  const info = lessonSummary(lang, next.level, next.index);
+  const fresh = src.st.completed.size === 0;
+  box.innerHTML = `
+    <article class="next-card" style="--module-a: ${info.module.a};">
+      <div class="next-main">
+        <p class="next-kicker">${next.level} ${info.levelInfo ? info.levelInfo.name : ""} · Lesson ${next.index + 1} of 5${info.lesson ? ` · ${info.lesson.minutes} min` : ""}</p>
+        <h3>${info.title}</h3>
+        ${info.lesson ? `<ul class="next-goals">${info.lesson.goals.map((g) => `<li>${g}</li>`).join("")}</ul>` : ""}
+        <div class="next-actions">
+          <button class="primary-btn" type="button" data-next-start>${info.done ? "Continue lesson" : "Start lesson"} →</button>
+          <a class="secondary-btn" href="#${lang}-plan" data-next-plan>Read the lesson plan</a>
+        </div>
+        ${fresh ? `<p class="next-hint">Not a beginner? <a href="#${placementId}">Take the placement check</a> to start at your level.</p>` : ""}
+      </div>
+      <div class="next-side">
+        <div class="ring next-ring" style="--progress: ${info.pct};"><span>${info.pct}%</span></div>
+        <p>${info.done} of ${info.total} rooms done</p>
+      </div>
+    </article>
+  `;
+  box.querySelector("[data-next-start]").addEventListener("click", () => startLesson(lang, next.level, next.index));
+  box.querySelector("[data-next-plan]").addEventListener("click", () => {
+    planView[lang].level = next.level;
+    planView[lang].open.add(`${next.level}-${next.index}`);
+    renderLessonPlan(lang);
+  });
+}
+
+// Home page: show where each course stands on the language cards.
+function renderLanding() {
+  ["de", "fr"].forEach((lang) => {
+    const el = document.getElementById(`${lang}-card-progress`);
+    if (!el) return;
+    const st = planSource(lang).st;
+    const next = findNextLesson(lang);
+    if (!next) { el.textContent = "Course complete"; return; }
+    const info = lessonSummary(lang, next.level, next.index);
+    el.textContent = st.completed.size
+      ? `Next: ${next.level} · Lesson ${next.index + 1} · ${info.title} (${info.pct}%)`
+      : `Start with ${next.level} · Lesson 1 · ${info.title}`;
+  });
+}
+
+function printLessonPlan(lang) {
+  const list = document.getElementById(`${lang}-plan-list`);
+  if (!list) return;
+  const wasOpen = [...list.querySelectorAll("details")].map((d) => d.open);
+  list.querySelectorAll("details").forEach((d) => { d.open = true; });
+  document.body.dataset.printPlan = lang;
+  window.addEventListener("afterprint", () => {
+    delete document.body.dataset.printPlan;
+    list.querySelectorAll("details").forEach((d, i) => { d.open = wasOpen[i]; });
+  }, { once: true });
+  window.print();
+}
+
+function initLessonPlans() {
+  ["de", "fr"].forEach((lang) => {
+    const tabs = document.getElementById(`${lang}-plan-tabs`);
+    const list = document.getElementById(`${lang}-plan-list`);
+    if (!tabs || !list) return;
+    const view = planView[lang];
+    tabs.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-plan-level]");
+      if (!btn) return;
+      view.level = btn.dataset.planLevel;
+      renderLessonPlan(lang);
+    });
+    list.addEventListener("toggle", (e) => {
+      const card = e.target.closest(".plan-card");
+      if (!card) return;
+      const key = `${view.level || planSource(lang).st.level}-${card.dataset.planIndex}`;
+      if (card.open) view.open.add(key); else view.open.delete(key);
+    }, true);
+    list.addEventListener("click", (e) => {
+      const level = view.level || planSource(lang).st.level;
+      const start = e.target.closest("[data-plan-start]");
+      if (start) { startLesson(lang, level, Number(start.dataset.planStart)); return; }
+      const btn = e.target.closest("[data-plan-open]");
+      if (!btn) return;
+      openPlanModule(lang, level, Number(btn.dataset.planOpen));
+    });
+    renderLessonPlan(lang);
+  });
+  document.querySelectorAll("[data-plan-print]").forEach((btn) => {
+    btn.addEventListener("click", () => printLessonPlan(btn.dataset.planPrint));
+  });
 }
 
 // ─── UNIT TEST MODAL ──────────────────────────────────────────────

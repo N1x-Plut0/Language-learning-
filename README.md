@@ -8,6 +8,7 @@ accounts** so progress follows you across devices.
 ## Features
 - 🇩🇪🇫🇷 Two full courses (German & French), each with 600+ practice questions, theory cards, unit tests, and reading lists.
 - 🧩 Interactive curriculum maze with XP, streaks, and per-module progress.
+- 📋 Lesson plans: one lesson per maze module (30 per language) with goals, grammar, vocabulary, rooms, speaking/writing tasks, and homework, all linked to the maze and ticked off as you progress. Printable.
 - 👤 **Accounts**: email + password sign-up/login, powered by [Supabase](https://supabase.com) (free, persistent).
 - 🙋 Guest mode: works without an account (progress saved in the browser), and syncs into your account when you log in.
 - ☁️ Fully static — hosted free on GitHub Pages, no server to run.
@@ -18,6 +19,11 @@ Once accounts are configured (see below), the site is published automatically to
 ```
 https://n1x-plut0.github.io/Language-learning-/
 ```
+
+Each language has its own page:
+
+- German: `https://n1x-plut0.github.io/Language-learning-/german/`
+- French: `https://n1x-plut0.github.io/Language-learning-/french/`
 
 Anyone can open that link, sign up, and log in — their progress is saved to their account.
 
@@ -36,12 +42,15 @@ works offline as a guest; once the Supabase keys are set, accounts work locally 
 ## Project layout
 | File | Purpose |
 |------|---------|
-| `index.html` | The main app (maze, practice, books, account UI). |
+| `index.html` | Home page: pick a language, see your progress in each course. |
+| `german/index.html` | German course page: next lesson, lesson plan, maze, practice, placement, basics, books. |
+| `french/index.html` | French course page (same layout as German). |
 | `app.js` | Course logic, rendering, state. |
 | `auth.js` | Account UI + Supabase auth & progress sync. |
 | `supabase-config.js` | Your Supabase URL + anon key. |
 | `schema.sql` | Database table + security policies (run once in Supabase). |
 | `de-*.js` / `fr-*.js` | Question banks, theory, unit tests, books. |
+| `de-plan.js` / `fr-plan.js` | Lesson plans: goals, vocabulary and activities for each module. |
 | `styles.css` | All styling. |
 | `title-1/2/3.html` | Alternative landing pages. |
 | `.github/workflows/deploy-pages.yml` | Auto-publishes the site to GitHub Pages. |

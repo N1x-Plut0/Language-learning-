@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>German · Maze Academy</title>
+  <meta name="description" content="Learn German from A1 to C2 with a lesson plan, practice rooms and unit tests.">
+  <link rel="stylesheet" href="../styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="../supabase-config.js" defer></script>
+  <script src="../de-tasks.js" defer></script>
+  <script src="../fr-tasks.js" defer></script>
+  <script src="../de-extra.js" defer></script>
+  <script src="../fr-extra.js" defer></script>
+  <script src="../de-tests.js" defer></script>
+  <script src="../fr-tests.js" defer></script>
+  <script src="../de-plan.js" defer></script>
+  <script src="../fr-plan.js" defer></script>
+  <script src="../app.js" defer></script>
+  <script src="../auth.js" defer></script>
+</head>
+<body class="lang-de">
+  <div class="page-texture" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="../index.html" aria-label="Maze Academy home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64" role="img">
+          <rect x="10" y="10" width="44" height="44" rx="7" fill="#F5E8BF"></rect>
+          <path d="M19 43V21h11c6 0 10 4 10 10s-4 12-12 12h-9zm8-6h2c4 0 6-2 6-6 0-3-2-5-6-5h-2v11z" fill="#C07828"></path>
+          <path d="M39 20h7v23h-7z" fill="#8898BC"></path>
+        </svg>
+      </span>
+      <span>Maze Academy</span>
+    </a>
+    <nav class="top-actions" aria-label="Primary navigation">
+      <a href="../index.html">← Languages</a>
+      <a href="#start">Start</a>
+      <a href="#de-plan">Lesson Plan</a>
+      <a href="#curriculum">Maze</a>
+      <a href="#practice">Practice</a>
+      <a href="#placement">Placement</a>
+      <a href="#basics">Basics</a>
+      <a href="#de-books">Books</a>
+      <a href="../french/index.html" class="nav-lang">Français</a>
+      <span class="account-area" id="account-area"></span>
+    </nav>
+  </header>
+
+  <main id="top">
+    <div class="app-shell" id="german">
+      <section class="hero-panel" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">German learning path</p>
+          <h1 id="hero-title">Learn German one lesson at a time.</h1>
+          <p class="lead">Follow the lesson plan from A1 to C2: each lesson opens ten practice rooms and ends with a unit test. Not a beginner? Take the placement check first.</p>
+          <div class="hero-metrics" aria-label="Course metrics">
+            <span><strong>6</strong> CEFR levels</span>
+            <span><strong>50</strong> rooms per level</span>
+            <span><strong>5</strong> learning routes</span>
+          </div>
+          <div class="hero-actions">
+            <a class="primary-btn" href="#start">Start learning</a>
+            <a class="secondary-btn" href="#placement">Find my level</a>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="German vocabulary collage">
+          <div class="string-lights" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="word-collage">
+            <div class="word-chip chip-gold"><span class="chip-label">Greet</span><strong>Guten Tag</strong></div>
+            <div class="word-chip chip-dark"><span class="chip-label">Ask</span><strong>Wie geht's?</strong></div>
+            <div class="word-chip chip-red"><span class="chip-label">Speak</span><strong>Ich moechte</strong></div>
+            <div class="word-chip chip-blue"><span class="chip-label">Listen</span><strong>Verstehen</strong></div>
+            <div class="word-chip chip-crimson"><span class="chip-label">Build</span><strong>Der Satz</strong></div>
+            <div class="word-chip chip-green"><span class="chip-label">Review</span><strong>Nochmal</strong></div>
+            <div class="word-chip chip-accent"><span class="chip-label">Route</span><strong>Weiter</strong></div>
+            <div class="word-chip chip-light"><span class="chip-label">Goal</span><strong>Fluency</strong></div>
+          </div>
+          <div class="de-flag" aria-hidden="true">
+            <span class="flag-black"></span>
+            <span class="flag-red"></span>
+            <span class="flag-gold"></span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="control-panel" aria-labelledby="pace-title">
+        <p class="panel-label">Session pace</p>
+        <h2 id="pace-title">Choose your lesson length</h2>
+        <div class="duration-grid">
+          <button class="duration-option active" type="button" data-duration="10" aria-pressed="true">10 min</button>
+          <button class="duration-option" type="button" data-duration="15" aria-pressed="false">15 min</button>
+          <button class="duration-option" type="button" data-duration="25" aria-pressed="false">25 min</button>
+          <button class="duration-option" type="button" data-duration="40" aria-pressed="false">40 min</button>
+        </div>
+        <div class="stat-row"><span>Current level</span><strong id="current-level">A1</strong></div>
+        <div class="stat-row"><span>Selected module</span><strong id="selected-module-label">Module 1</strong></div>
+        <div class="stat-row"><span>Tasks</span><strong id="task-count">10</strong></div>
+        <div class="stat-row"><span>Streak</span><strong id="streak-count">0</strong></div>
+        <div class="stat-row"><span>XP</span><strong id="xp-count">0</strong></div>
+        <p class="journey-note" id="journey-copy">Choose a pace, then open any room in the maze.</p>
+      </aside>
+    </div>
+
+    <!-- ── DE NEXT LESSON ───────────────────────────── -->
+    <section class="section-band next-section" id="start" aria-labelledby="de-next-title">
+      <div class="section-heading">
+        <p class="eyebrow">Your next step</p>
+        <h2 id="de-next-title">Continue your German course</h2>
+      </div>
+      <div class="next-lesson" id="de-next"></div>
+    </section>
+
+
+    <!-- ── DE LESSON PLAN ───────────────────────────── -->
+    <section class="section-band plan-section" id="de-plan" aria-labelledby="de-plan-title">
+      <div class="section-heading with-tools">
+        <div>
+          <p class="eyebrow">German lesson plan</p>
+          <h2 id="de-plan-title">One lesson for every maze module</h2>
+          <p class="lead">Five lessons per level, each one built on that module's grammar, ten rooms, unit test and reading. Open any lesson in the maze, and your completed rooms are ticked off here.</p>
+        </div>
+        <div class="plan-tools">
+          <div class="level-tabs" id="de-plan-tabs" aria-label="Lesson plan level"></div>
+          <button class="secondary-btn plan-print" type="button" data-plan-print="de">Print plan</button>
+        </div>
+      </div>
+      <div class="plan-list" id="de-plan-list"></div>
+    </section>
+
+    <section class="section-band" id="curriculum" aria-labelledby="curriculum-title">
+      <div class="section-heading with-tools">
+        <div>
+          <p class="eyebrow">Curriculum maze</p>
+          <h2 id="curriculum-title">Pick a level and route</h2>
+          <p class="lead">Each level contains five modules with ten short rooms.</p>
+        </div>
+        <div class="level-tabs" id="level-tabs" aria-label="Level tabs"></div>
+      </div>
+      <div class="maze-layout">
+        <nav class="module-list" id="module-list" aria-label="Modules"></nav>
+        <section class="maze-board" aria-labelledby="maze-title">
+          <div class="maze-title-row">
+            <div>
+              <p class="panel-label" id="maze-level-label">A1</p>
+              <h3 id="maze-title">Module 1</h3>
+            </div>
+            <span class="theme-chip" id="maze-theme">Clay + Sage</span>
+          </div>
+          <div class="maze-map" id="maze-map"></div>
+        </section>
+      </div>
+    </section>
+
+    <section class="section-band" id="practice" aria-labelledby="practice-title">
+      <div class="section-heading">
+        <p class="eyebrow">Practice room</p>
+        <h2 id="practice-title">A1 - Module 1</h2>
+        <p class="lead practice-lesson" id="de-practice-lesson"></p>
+      </div>
+      <div class="practice-layout">
+        <section class="task-panel">
+          <div class="task-topline">
+            <span id="task-position">Task 1 of 10</span>
+            <span id="task-time">10 min session</span>
+          </div>
+          <h3 id="task-title">Greetings</h3>
+          <p id="task-description"></p>
+          <div class="task-meta">
+            <span id="task-skill">Vocabulary</span>
+            <span id="task-mode">Guided drill</span>
+            <span id="lesson-reward">+15 XP</span>
+          </div>
+          <details class="theory-card" id="theory-card">
+            <summary class="theory-summary"><span class="theory-icon" aria-hidden="true">◈</span> <span id="theory-module-title">Module theory</span></summary>
+            <div class="theory-body" id="theory-body"></div>
+          </details>
+          <div class="lesson-card">
+            <div class="lesson-card-topline">
+              <span>Warm-up</span>
+              <span>Instant check</span>
+            </div>
+            <p id="lesson-prompt"></p>
+            <div class="lesson-options" id="lesson-options"></div>
+            <p class="lesson-feedback" id="lesson-feedback"></p>
+          </div>
+          <div class="task-actions">
+            <button class="secondary-btn icon-btn" type="button" id="prev-task" aria-label="Previous task">‹</button>
+            <button class="primary-btn" type="button" id="complete-task">Complete room</button>
+            <button class="secondary-btn icon-btn" type="button" id="next-task" aria-label="Next task">›</button>
+          </div>
+        </section>
+        <aside class="progress-panel">
+          <p class="panel-label">Module progress</p>
+          <div class="ring" id="progress-ring"><span id="progress-value">0%</span></div>
+          <p id="progress-copy">0 of 10 tasks complete.</p>
+          <button class="unit-test-btn" id="unit-test-btn" type="button" hidden>Take Unit Test</button>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-band" id="placement" aria-labelledby="placement-title">
+      <div class="section-heading">
+        <p class="eyebrow">Placement</p>
+        <h2 id="placement-title">Check your starting point</h2>
+        <p class="lead">Answer the quick diagnostic and the course will recommend a CEFR level.</p>
+      </div>
+      <div class="assessment-layout">
+        <form class="test-card" id="placement-form">
+          <div id="questions"></div>
+          <button class="primary-btn full" type="submit">Get recommendation</button>
+        </form>
+        <aside class="result-card" aria-live="polite">
+          <p class="panel-label">Result</p>
+          <h3 id="result-title">Ready when you are</h3>
+          <p id="result-copy">Your recommendation will appear here after the placement check.</p>
+          <div class="score-meter" aria-hidden="true"><span id="score-bar"></span></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-band" id="basics" aria-labelledby="basics-title">
+      <div class="section-heading">
+        <p class="eyebrow">German basics</p>
+        <h2 id="basics-title">Reference cards</h2>
+        <p class="lead">Keep the core patterns close while you move through the course.</p>
+      </div>
+
+      <div class="basics-grid">
+        <article class="basics-card">
+          <div class="basics-card-head">
+            <span class="basics-icon-wrap chip-green" aria-hidden="true">Aa</span>
+            <div>
+              <h3>Alphabet sounds</h3>
+              <p>Start with clean vowels and consonant pairs.</p>
+            </div>
+          </div>
+          <div class="alphabet-strip" aria-label="German alphabet">
+            <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>I</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span><span>P</span><span>Q</span><span>R</span><span>S</span><span>T</span><span>U</span><span>V</span><span>W</span><span>X</span><span>Y</span><span>Z</span>
+          </div>
+          <div class="special-letters">
+            <div class="special-letter"><span class="sl-char">ae</span><span class="sl-sound">like air</span><span class="sl-tip"><em>Maedchen</em></span></div>
+            <div class="special-letter"><span class="sl-char">oe</span><span class="sl-sound">rounded e</span><span class="sl-tip"><em>schoen</em></span></div>
+            <div class="special-letter"><span class="sl-char">ue</span><span class="sl-sound">rounded u</span><span class="sl-tip"><em>fuer</em></span></div>
+            <div class="special-letter"><span class="sl-char">ss</span><span class="sl-sound">sharp s</span><span class="sl-tip"><em>Strasse</em></span></div>
+          </div>
+        </article>
+
+        <article class="basics-card">
+          <div class="basics-card-head">
+            <span class="basics-icon-wrap chip-accent" aria-hidden="true">1</span>
+            <div>
+              <h3>Numbers</h3>
+              <p>Useful for times, prices, and directions.</p>
+            </div>
+          </div>
+          <div class="number-grid">
+            <div class="num-cell"><span class="num-int">1</span><span class="num-de">eins</span></div>
+            <div class="num-cell"><span class="num-int">2</span><span class="num-de">zwei</span></div>
+            <div class="num-cell"><span class="num-int">3</span><span class="num-de">drei</span></div>
+            <div class="num-cell"><span class="num-int">4</span><span class="num-de">vier</span></div>
+            <div class="num-cell"><span class="num-int">5</span><span class="num-de">fuenf</span></div>
+            <div class="num-cell"><span class="num-int">6</span><span class="num-de">sechs</span></div>
+            <div class="num-cell"><span class="num-int">7</span><span class="num-de">sieben</span></div>
+            <div class="num-cell"><span class="num-int">8</span><span class="num-de">acht</span></div>
+            <div class="num-cell"><span class="num-int">9</span><span class="num-de">neun</span></div>
+            <div class="num-cell"><span class="num-int">10</span><span class="num-de">zehn</span></div>
+          </div>
+        </article>
+
+        <article class="basics-card wide-card">
+          <div class="basics-card-head">
+            <span class="basics-icon-wrap chip-dark" aria-hidden="true">der</span>
+            <div>
+              <h3>Articles and sentence order</h3>
+              <p>German rewards noticing gender and verb position early.</p>
+            </div>
+          </div>
+          <div class="article-trio">
+            <div class="article-card ac-blue"><div class="ac-word">der</div><div class="ac-gender">masculine</div><ul class="ac-examples"><li><strong>Tisch</strong><em>table</em></li><li><strong>Stuhl</strong><em>chair</em></li></ul></div>
+            <div class="article-card ac-red"><div class="ac-word">die</div><div class="ac-gender">feminine</div><ul class="ac-examples"><li><strong>Lampe</strong><em>lamp</em></li><li><strong>Sprache</strong><em>language</em></li></ul></div>
+            <div class="article-card ac-green"><div class="ac-word">das</div><div class="ac-gender">neuter</div><ul class="ac-examples"><li><strong>Buch</strong><em>book</em></li><li><strong>Haus</strong><em>house</em></li></ul></div>
+          </div>
+          <div class="sentence-diagram">
+            <div class="svo-block svo-s"><span class="svo-label">Subject</span><span class="svo-example">Ich</span><span class="svo-en">I</span></div>
+            <span class="svo-arrow">+</span>
+            <div class="svo-block svo-v"><span class="svo-label">Verb</span><span class="svo-example">lerne</span><span class="svo-en">learn</span></div>
+            <span class="svo-arrow">+</span>
+            <div class="svo-block svo-o"><span class="svo-label">Object</span><span class="svo-example">Deutsch</span><span class="svo-en">German</span></div>
+          </div>
+          <p class="basics-note"><span aria-hidden="true">i</span><span>In main clauses, the conjugated verb usually holds the second position.</span></p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ── DE BOOKS ─────────────────────────────────── -->
+    <section class="section-band" id="de-books" aria-labelledby="de-books-title">
+      <div class="section-heading">
+        <p class="eyebrow">German reading list</p>
+        <h2 id="de-books-title">Recommended books &amp; resources</h2>
+        <p class="lead">Curated picks for every CEFR level — graded readers, textbooks, and online courses.</p>
+      </div>
+      <div class="books-grid" id="de-books-grid"></div>
+    </section>
+
+    <!-- ── UNIT TEST MODAL ───────────────────────────── -->
+    <div class="unit-modal" id="unit-test-modal" role="dialog" aria-modal="true" aria-labelledby="unit-modal-heading" hidden>
+      <div class="unit-modal-inner">
+        <div class="unit-modal-header">
+          <h2 id="unit-modal-heading">Unit Test</h2>
+          <button class="unit-modal-close" id="unit-modal-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div id="unit-modal-questions" class="unit-modal-questions"></div>
+        <div class="unit-modal-result" id="unit-modal-result" hidden>
+          <p class="unit-modal-score" id="unit-modal-score"></p>
+          <p class="unit-modal-verdict" id="unit-modal-verdict"></p>
+          <div class="unit-modal-result-actions">
+            <button class="secondary-btn" id="unit-modal-retry" type="button">Try again</button>
+            <button class="primary-btn" id="unit-modal-next" type="button">Next module →</button>
+          </div>
+        </div>
+        <div class="unit-modal-actions" id="unit-modal-actions">
+          <button class="primary-btn full" id="unit-modal-submit" type="button">Submit answers</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── AUTH MODAL ────────────────────────────────── -->
+    <div class="unit-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-heading" data-mode="login" hidden>
+      <div class="unit-modal-inner auth-modal-inner">
+        <div class="unit-modal-header">
+          <h2 id="auth-heading">Your account</h2>
+          <button class="unit-modal-close" id="auth-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" id="auth-tab-login" type="button" role="tab">Log in</button>
+          <button class="auth-tab" id="auth-tab-signup" type="button" role="tab">Sign up</button>
+        </div>
+        <form class="auth-form" id="auth-form">
+          <label class="auth-label" for="auth-email">Email</label>
+          <input class="auth-input" id="auth-email" type="email" autocomplete="email" required>
+          <label class="auth-label" for="auth-password">Password</label>
+          <input class="auth-input" id="auth-password" type="password" autocomplete="current-password" minlength="6" required>
+          <p class="auth-message" id="auth-message" aria-live="polite"></p>
+          <button class="primary-btn full" id="auth-submit" type="submit">Log in</button>
+        </form>
+        <p class="auth-hint">Your progress syncs to your account and follows you across devices.</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
