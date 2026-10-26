@@ -35,7 +35,7 @@ const skills = ["Vocabulary", "Pronunciation", "Grammar", "Listening", "Speaking
 const questions = [
   {
     prompt: "Choose the best German greeting for a first meeting.",
-    answers: ["Tschuess", "Guten Tag", "Bitte sehr", "Vielleicht"],
+    answers: ["Tschüss", "Guten Tag", "Bitte sehr", "Vielleicht"],
     correct: 1
   },
   {
@@ -45,7 +45,7 @@ const questions = [
   },
   {
     prompt: "Translate: I would like a coffee.",
-    answers: ["Ich habe Kaffee", "Ich moechte einen Kaffee", "Ich bin Kaffee", "Ich gehe Kaffee"],
+    answers: ["Ich habe Kaffee", "Ich möchte einen Kaffee", "Ich bin Kaffee", "Ich gehe Kaffee"],
     correct: 1
   },
   {
@@ -75,7 +75,7 @@ const questions = [
   },
   {
     prompt: "Which phrase sounds more formal?",
-    answers: ["Was geht?", "Ich haette gern Ihre Meinung dazu", "Na, alles klar?", "Komm mal her"],
+    answers: ["Was geht?", "Ich hätte gern Ihre Meinung dazu", "Na, alles klar?", "Komm mal her"],
     correct: 1
   },
   {
@@ -90,12 +90,12 @@ const questions = [
   },
   {
     prompt: "Pick the phrase that softens disagreement in advanced discussion.",
-    answers: ["Das ist falsch", "Das stimmt nie", "Ich sehe den Punkt, wuerde aber ergaenzen", "Nein, Ende"],
+    answers: ["Das ist falsch", "Das stimmt nie", "Ich sehe den Punkt, würde aber ergänzen", "Nein, Ende"],
     correct: 2
   },
   {
     prompt: "Which sentence has a nominalized verb?",
-    answers: ["Das Lernen fallt mir leicht", "Ich lerne leicht", "Du lernst gern", "Wir haben gelernt"],
+    answers: ["Das Lernen fällt mir leicht", "Ich lerne leicht", "Du lernst gern", "Wir haben gelernt"],
     correct: 0
   },
   {
@@ -400,13 +400,14 @@ function renderTask() {
   els.taskMode.textContent = task.mode;
   els.progressRing.style.setProperty("--progress", percent);
   els.progressValue.textContent = `${percent}%`;
-  els.progressCopy.textContent = percent === 100 ? "Module complete. The next route is ready." : `${completedInModule} of ${module.tasks.length} tasks complete.`;
+  els.progressCopy.textContent = percent === 100 ? "All rooms done: take the unit test to finish the lesson." : `${completedInModule} of ${module.tasks.length} rooms done. The unit test unlocks at 10.`;
   els.journeyCopy.textContent = state.streak > 0 ? `${state.streak} correct warm-up${state.streak === 1 ? "" : "s"} in a row. Keep the route glowing.` : "Choose a pace, then open any room in the maze.";
   els.lessonReward.textContent = `+${reward} XP`;
   if (typeof deModuleTheory !== "undefined") {
     renderTheory(deModuleTheory, state.level, state.module, els.theoryModuleTitle, els.theoryBody);
   }
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
+  if (els.completeTask) els.completeTask.textContent = roomButtonLabel(state, module);
   renderActivity(task);
   renderLessonPlan("de");
   renderNextLesson("de");
@@ -442,7 +443,7 @@ function bindEvents() {
     renderModules();
     renderMaze();
     renderTask();
-    document.getElementById("curriculum").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("start").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   els.levelTabs.addEventListener("click", (event) => {
@@ -495,10 +496,11 @@ function bindEvents() {
   });
 
   els.completeTask.addEventListener("click", () => {
-    const task = getCurrentModule().tasks[state.task];
-    state.completed.add(task.id);
-    if (state.task < getCurrentModule().tasks.length - 1) {
-      state.task += 1;
+    const outcome = advanceRoom(state, getCurrentModule(), "de");
+    if (outcome === "unanswered") {
+      els.lessonFeedback.className = "lesson-feedback retry";
+      els.lessonFeedback.textContent = "Answer the question above first: the room counts as done once you get it right.";
+      return;
     }
     renderMaze();
     renderTask();
@@ -521,18 +523,89 @@ function getTaskQ(bank, levelId, taskIndex, moduleIndex) {
   return null;
 }
 
+// Option order: the banks list the correct answer in predictable places, so
+// options are shuffled. A seed keeps the order stable for a given room.
+function shuffledOrder(count, seed) {
+  let h = 2166136261;
+  for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const order = [...Array(count).keys()];
+  for (let i = count - 1; i > 0; i -= 1) {
+    h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0;
+    const j = h % (i + 1);
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+function bankedActivity(banked, seed, goodText) {
+  const order = shuffledOrder(banked.opts.length, seed);
+  return {
+    prompt: () => banked.q,
+    options: () => order.map((i) => banked.opts[i]),
+    correct: order.indexOf(banked.a),
+    feedback: banked.ex ? `${goodText} ${banked.ex}` : goodText,
+    ex: banked.ex || ""
+  };
+}
+
+// Room flow: a room counts as done once its question is answered correctly
+// (or the answer was revealed). The main button then moves on, and on the
+// last room of a finished module it opens the unit test.
+function roomButtonLabel(st, module) {
+  const task = module.tasks[st.task];
+  const done = st.completed.has(task.id);
+  const allDone = module.tasks.every((t) => st.completed.has(t.id));
+  if (!done) return "Complete room";
+  if (allDone) return "Take the unit test →";
+  return "Next room →";
+}
+
+function advanceRoom(st, module, lang) {
+  const task = module.tasks[st.task];
+  if (!st.completed.has(task.id)) return "unanswered";
+  if (module.tasks.every((t) => st.completed.has(t.id))) { openUnitTest(lang); return "test"; }
+  const nextOpen = module.tasks.findIndex((t, i) => i > st.task && !st.completed.has(t.id));
+  const firstOpen = module.tasks.findIndex((t) => !st.completed.has(t.id));
+  st.task = nextOpen !== -1 ? nextOpen : firstOpen;
+  return "moved";
+}
+
+// Wrong answers: the first miss only marks the chosen option; the second
+// reveals the answer and its explanation (no XP for a revealed answer).
+const answerAttempts = new Map();
+const revealedAnswers = new Set();
+
+function applyAnswer({ taskId, activity, answerIndex, optionsEl, feedbackEl, solvedSet, retryText, revealText }) {
+  const buttons = [...optionsEl.querySelectorAll(".lesson-option")];
+  if (answerIndex === activity.correct) {
+    buttons.forEach((b, i) => b.classList.toggle("correct", i === activity.correct));
+    const earned = !solvedSet.has(taskId) && !revealedAnswers.has(taskId);
+    solvedSet.add(taskId);
+    answerAttempts.delete(taskId);
+    feedbackEl.className = "lesson-feedback good";
+    feedbackEl.textContent = activity.feedback;
+    return { correct: true, earned };
+  }
+  const attempts = (answerAttempts.get(taskId) || 0) + 1;
+  answerAttempts.set(taskId, attempts);
+  const button = buttons[answerIndex];
+  if (button) { button.classList.add("wrong"); button.disabled = true; }
+  feedbackEl.className = "lesson-feedback retry";
+  if (attempts >= 2) {
+    revealedAnswers.add(taskId);
+    buttons.forEach((b, i) => b.classList.toggle("correct", i === activity.correct));
+    feedbackEl.textContent = `${revealText} ${activity.options()[activity.correct]}.${activity.ex ? ` ${activity.ex}` : ""}`;
+  } else {
+    feedbackEl.textContent = retryText;
+  }
+  return { correct: false, earned: false };
+}
+
 function getActivity(task = getCurrentTask()) {
   const banked = (typeof deTaskQBank !== "undefined")
     ? getTaskQ(deTaskQBank, state.level, state.task, state.module)
     : null;
-  if (banked) {
-    return {
-      prompt: () => banked.q,
-      options: () => banked.opts,
-      correct: banked.a,
-      feedback: "Richtig! That is the correct answer."
-    };
-  }
+  if (banked) return bankedActivity(banked, task.id, "Richtig!");
   const fallback = activityTemplates[(task.number + state.module) % activityTemplates.length];
   return {
     prompt: () => fallback.prompt(task, state.level),
@@ -576,26 +649,21 @@ function renderActivity(task) {
 function checkActivityAnswer(answerIndex) {
   const task = getCurrentTask();
   const activity = getActivity(task);
-  const buttons = [...els.lessonOptions.querySelectorAll(".lesson-option")];
-  buttons.forEach((button, index) => {
-    button.classList.toggle("correct", index === activity.correct);
-    button.classList.toggle("wrong", index === answerIndex && index !== activity.correct);
+  const result = applyAnswer({
+    taskId: task.id, activity, answerIndex,
+    optionsEl: els.lessonOptions, feedbackEl: els.lessonFeedback, solvedSet: state.solved,
+    retryText: "Not quite. Have another look and try again.",
+    revealText: "The answer is:"
   });
-
-  if (answerIndex === activity.correct) {
-    const isNewSolve = !state.solved.has(task.id);
-    state.solved.add(task.id);
+  if (result.correct) {
     state.streak += 1;
-    if (isNewSolve) {
-      state.xp += getReward();
-    }
-    els.lessonFeedback.className = "lesson-feedback good";
-    els.lessonFeedback.textContent = activity.feedback;
+    if (result.earned) state.xp += getReward();
+    state.completed.add(task.id);
+    renderMaze();
+    renderTask();
     celebrate();
   } else {
     state.streak = 0;
-    els.lessonFeedback.className = "lesson-feedback retry";
-    els.lessonFeedback.textContent = "Close. Try the option that matches this room's focus.";
   }
 
   els.xpCount.textContent = state.xp;
@@ -733,14 +801,7 @@ function frGetActivity(task)  {
   const banked = (typeof frTaskQBank !== "undefined")
     ? getTaskQ(frTaskQBank, frState.level, frState.task, frState.module)
     : null;
-  if (banked) {
-    return {
-      prompt: () => banked.q,
-      options: () => banked.opts,
-      correct: banked.a,
-      feedback: "Correct ! C'est la bonne reponse."
-    };
-  }
+  if (banked) return bankedActivity(banked, task.id, "Correct !");
   const fallback = frActivityTemplates[(task.number + frState.module) % frActivityTemplates.length];
   return {
     prompt: () => fallback.prompt(task, frState.level),
@@ -836,8 +897,8 @@ function frRenderTask() {
   frEls.progressRing.style.setProperty("--progress", pct);
   frEls.progressValue.textContent = `${pct}%`;
   frEls.progressCopy.textContent = pct === 100
-    ? "Module complete. The next route is ready."
-    : `${done} of ${module.tasks.length} tasks complete.`;
+    ? "All rooms done: take the unit test to finish the lesson."
+    : `${done} of ${module.tasks.length} rooms done. The unit test unlocks at 10.`;
   frEls.xpCount.textContent = frState.xp;
   frEls.streakCount.textContent = frState.streak;
   frEls.lessonReward.textContent = `+${frGetReward()} XP`;
@@ -848,6 +909,7 @@ function frRenderTask() {
   }
   const frBtn = document.getElementById("fr-unit-test-btn");
   if (frBtn) frBtn.hidden = pct !== 100;
+  if (frEls.completeTask) frEls.completeTask.textContent = roomButtonLabel(frState, module);
   frRenderActivity(task);
   renderLessonPlan("fr");
   renderNextLesson("fr");
@@ -871,21 +933,20 @@ function frRenderActivity(task) {
 function frCheckAnswer(answerIndex) {
   const task = frGetCurrentTask();
   const activity = frGetActivity(task);
-  [...frEls.lessonOptions.querySelectorAll(".lesson-option")].forEach((btn, i) => {
-    btn.classList.toggle("correct", i === activity.correct);
-    btn.classList.toggle("wrong", i === answerIndex && i !== activity.correct);
+  const result = applyAnswer({
+    taskId: task.id, activity, answerIndex,
+    optionsEl: frEls.lessonOptions, feedbackEl: frEls.lessonFeedback, solvedSet: frState.solved,
+    retryText: "Pas tout à fait. Have another look and try again.",
+    revealText: "La bonne réponse :"
   });
-  if (answerIndex === activity.correct) {
-    const fresh = !frState.solved.has(task.id);
-    frState.solved.add(task.id);
+  if (result.correct) {
     frState.streak += 1;
-    if (fresh) frState.xp += frGetReward();
-    frEls.lessonFeedback.className = "lesson-feedback good";
-    frEls.lessonFeedback.textContent = activity.feedback;
+    if (result.earned) frState.xp += frGetReward();
+    frState.completed.add(task.id);
+    frRenderMaze();
+    frRenderTask();
   } else {
     frState.streak = 0;
-    frEls.lessonFeedback.className = "lesson-feedback retry";
-    frEls.lessonFeedback.textContent = "Réessayez. Try the option that matches this room's focus.";
   }
   frEls.xpCount.textContent = frState.xp;
   frEls.streakCount.textContent = frState.streak;
@@ -920,7 +981,7 @@ function frBindEvents() {
       frRenderModules();
       frRenderMaze();
       frRenderTask();
-      document.getElementById("fr-curriculum").scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("fr-start").scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -987,9 +1048,12 @@ function frBindEvents() {
 
   if (frEls.completeTask) {
     frEls.completeTask.addEventListener("click", () => {
-      const task = frGetCurrentModule().tasks[frState.task];
-      frState.completed.add(task.id);
-      if (frState.task < frGetCurrentModule().tasks.length - 1) frState.task += 1;
+      const outcome = advanceRoom(frState, frGetCurrentModule(), "fr");
+      if (outcome === "unanswered") {
+        frEls.lessonFeedback.className = "lesson-feedback retry";
+        frEls.lessonFeedback.textContent = "Répondez d'abord : the room counts as done once you get the question right.";
+        return;
+      }
       frRenderMaze();
       frRenderTask();
     });
@@ -1204,6 +1268,8 @@ function startLesson(lang, level, index) {
   st.task = firstOpen === -1 ? 0 : firstOpen;
   if (lang === "fr") { frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask(); }
   else { renderLevelTabs(); renderModules(); renderMaze(); renderTask(); }
+  const theoryCard = document.getElementById(lang === "fr" ? "fr-theory-card" : "theory-card");
+  if (theoryCard && firstOpen <= 0) theoryCard.open = true;
   const target = document.getElementById(lang === "fr" ? "fr-practice" : "practice");
   if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1334,11 +1400,11 @@ function initNavSpy() {
   targets.forEach((t) => observer.observe(t));
 }
 
-// Practice room shortcuts: 1-4 pick an answer, arrows move between rooms.
+// Practice room shortcuts: 1-4 pick an answer, Enter moves on, arrows switch rooms.
 function initPracticeKeys() {
   const rooms = [
-    { section: "practice", options: "lesson-options", prev: "prev-task", next: "next-task" },
-    { section: "fr-practice", options: "fr-lesson-options", prev: "fr-prev-task", next: "fr-next-task" }
+    { section: "practice", options: "lesson-options", prev: "prev-task", next: "next-task", go: "complete-task" },
+    { section: "fr-practice", options: "fr-lesson-options", prev: "fr-prev-task", next: "fr-next-task", go: "fr-complete-task" }
   ].filter((r) => document.getElementById(r.section));
   if (!rooms.length) return;
   document.addEventListener("keydown", (e) => {
@@ -1351,6 +1417,9 @@ function initPracticeKeys() {
     if (!room) return;
     if (/^[1-4]$/.test(e.key)) {
       const btn = document.getElementById(room.options).querySelectorAll(".lesson-option")[Number(e.key) - 1];
+      if (btn) { btn.click(); e.preventDefault(); }
+    } else if (e.key === "Enter" && !e.target.closest("button, a, summary")) {
+      const btn = document.getElementById(room.go);
       if (btn) { btn.click(); e.preventDefault(); }
     } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const btn = document.getElementById(e.key === "ArrowLeft" ? room.prev : room.next);
@@ -1376,7 +1445,10 @@ function openUnitTest(lang) {
   unitTest.lang = lang;
   unitTest.level = isFr ? frState.level : state.level;
   unitTest.module = isFr ? frState.module : state.module;
-  unitTest.questions = getUnitTestQuestions(lang, unitTest.level, unitTest.module);
+  unitTest.questions = getUnitTestQuestions(lang, unitTest.level, unitTest.module).map((q) => {
+    const order = shuffledOrder(q.opts.length, `${Math.random()}`);
+    return { q: q.q, ex: q.ex || "", opts: order.map((i) => q.opts[i]), a: order.indexOf(q.a) };
+  });
 
   const heading = document.getElementById("unit-modal-heading");
   const moduleNum = unitTest.module + 1;
@@ -1394,8 +1466,10 @@ function openUnitTest(lang) {
           </label>
         `).join("")}
       </div>
+      <p class="unit-q-ex" hidden></p>
     </fieldset>
   `).join("");
+  container.scrollTop = 0;
 
   document.getElementById("unit-modal-result").hidden = true;
   document.getElementById("unit-modal-actions").hidden = false;
@@ -1411,6 +1485,13 @@ function closeUnitTest() {
 
 function submitUnitTest() {
   const container = document.getElementById("unit-modal-questions");
+  const fieldsets = [...container.querySelectorAll("fieldset")];
+  const missing = fieldsets.findIndex((f) => !f.querySelector("input:checked"));
+  if (missing !== -1) {
+    fieldsets.forEach((f) => f.classList.toggle("unanswered", !f.querySelector("input:checked")));
+    fieldsets[missing].scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   let score = 0;
   unitTest.questions.forEach((q, i) => {
     const checked = container.querySelector(`input[name="ut${i}"]:checked`);
@@ -1424,6 +1505,10 @@ function submitUnitTest() {
         if (j === q.a) label.classList.add("correct");
         else if (checked && Number(checked.value) === j) label.classList.add("wrong");
       });
+      fieldset.classList.remove("unanswered");
+      fieldset.querySelectorAll("input").forEach((input) => { input.disabled = true; });
+      const ex = fieldset.querySelector(".unit-q-ex");
+      if (ex && q.ex) { ex.textContent = q.ex; ex.hidden = false; }
     }
   });
 
@@ -1433,18 +1518,19 @@ function submitUnitTest() {
   const verdict = document.getElementById("unit-modal-verdict");
   if (passed) {
     verdict.textContent = unitTest.lang === "fr"
-      ? "Reussi ! +100 XP gagnes."
+      ? "Réussi ! +100 XP gagnés."
       : "Passed! +100 XP earned.";
     if (unitTest.lang === "fr") { frState.xp += 100; if (frEls.xpCount) frEls.xpCount.textContent = frState.xp; }
     else { state.xp += 100; if (els.xpCount) els.xpCount.textContent = state.xp; }
   } else {
     verdict.textContent = unitTest.lang === "fr"
-      ? `Il faut 7/10 pour reussir. Reessayez !`
+      ? `Il faut 7/10 pour réussir. Réessayez !`
       : `You need 7/10 to pass. Try again!`;
   }
 
   document.getElementById("unit-modal-actions").hidden = true;
   document.getElementById("unit-modal-result").hidden = false;
+  document.getElementById("unit-modal-next").hidden = !passed;
   if (passed) notifyProgressChange();
 }
 
