@@ -2597,3 +2597,8 @@ h3 {
 }
 
 .fr-intro-card { overflow: hidden; }
+
+/* Current section in the nav uses the existing hover look. */
+.top-actions a.active { color: var(--accent); }
+.top-actions a.active::after { transform: scaleX(1); }
+.plan-sublevel { grid-column: 1 / -1; }
