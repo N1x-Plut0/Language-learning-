@@ -2607,3 +2607,5 @@ h3 {
 .lesson-option:disabled { cursor: default; opacity: 0.75; }
 .unit-q-ex { margin-top: 8px; font-size: 0.9rem; font-style: italic; color: var(--muted); line-height: 1.45; }
 .question.unanswered { outline: 2px dashed rgba(192,120,40,0.6); outline-offset: 4px; border-radius: var(--radius-sm); }
+
+.unit-test-btn[hidden] { display: none; }

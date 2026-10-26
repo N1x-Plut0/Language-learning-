@@ -400,13 +400,14 @@ function renderTask() {
   els.taskMode.textContent = task.mode;
   els.progressRing.style.setProperty("--progress", percent);
   els.progressValue.textContent = `${percent}%`;
-  els.progressCopy.textContent = percent === 100 ? "Module complete. The next route is ready." : `${completedInModule} of ${module.tasks.length} tasks complete.`;
+  els.progressCopy.textContent = percent === 100 ? "All rooms done: take the unit test to finish the lesson." : `${completedInModule} of ${module.tasks.length} rooms done. The unit test unlocks at 10.`;
   els.journeyCopy.textContent = state.streak > 0 ? `${state.streak} correct warm-up${state.streak === 1 ? "" : "s"} in a row. Keep the route glowing.` : "Choose a pace, then open any room in the maze.";
   els.lessonReward.textContent = `+${reward} XP`;
   if (typeof deModuleTheory !== "undefined") {
     renderTheory(deModuleTheory, state.level, state.module, els.theoryModuleTitle, els.theoryBody);
   }
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
+  if (els.completeTask) els.completeTask.textContent = roomButtonLabel(state, module);
   renderActivity(task);
   renderLessonPlan("de");
   renderNextLesson("de");
@@ -442,7 +443,7 @@ function bindEvents() {
     renderModules();
     renderMaze();
     renderTask();
-    document.getElementById("curriculum").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("start").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   els.levelTabs.addEventListener("click", (event) => {
@@ -495,10 +496,11 @@ function bindEvents() {
   });
 
   els.completeTask.addEventListener("click", () => {
-    const task = getCurrentModule().tasks[state.task];
-    state.completed.add(task.id);
-    if (state.task < getCurrentModule().tasks.length - 1) {
-      state.task += 1;
+    const outcome = advanceRoom(state, getCurrentModule(), "de");
+    if (outcome === "unanswered") {
+      els.lessonFeedback.className = "lesson-feedback retry";
+      els.lessonFeedback.textContent = "Answer the question above first: the room counts as done once you get it right.";
+      return;
     }
     renderMaze();
     renderTask();
@@ -544,6 +546,28 @@ function bankedActivity(banked, seed, goodText) {
     feedback: banked.ex ? `${goodText} ${banked.ex}` : goodText,
     ex: banked.ex || ""
   };
+}
+
+// Room flow: a room counts as done once its question is answered correctly
+// (or the answer was revealed). The main button then moves on, and on the
+// last room of a finished module it opens the unit test.
+function roomButtonLabel(st, module) {
+  const task = module.tasks[st.task];
+  const done = st.completed.has(task.id);
+  const allDone = module.tasks.every((t) => st.completed.has(t.id));
+  if (!done) return "Complete room";
+  if (allDone) return "Take the unit test →";
+  return "Next room →";
+}
+
+function advanceRoom(st, module, lang) {
+  const task = module.tasks[st.task];
+  if (!st.completed.has(task.id)) return "unanswered";
+  if (module.tasks.every((t) => st.completed.has(t.id))) { openUnitTest(lang); return "test"; }
+  const nextOpen = module.tasks.findIndex((t, i) => i > st.task && !st.completed.has(t.id));
+  const firstOpen = module.tasks.findIndex((t) => !st.completed.has(t.id));
+  st.task = nextOpen !== -1 ? nextOpen : firstOpen;
+  return "moved";
 }
 
 // Wrong answers: the first miss only marks the chosen option; the second
@@ -634,6 +658,9 @@ function checkActivityAnswer(answerIndex) {
   if (result.correct) {
     state.streak += 1;
     if (result.earned) state.xp += getReward();
+    state.completed.add(task.id);
+    renderMaze();
+    renderTask();
     celebrate();
   } else {
     state.streak = 0;
@@ -870,8 +897,8 @@ function frRenderTask() {
   frEls.progressRing.style.setProperty("--progress", pct);
   frEls.progressValue.textContent = `${pct}%`;
   frEls.progressCopy.textContent = pct === 100
-    ? "Module complete. The next route is ready."
-    : `${done} of ${module.tasks.length} tasks complete.`;
+    ? "All rooms done: take the unit test to finish the lesson."
+    : `${done} of ${module.tasks.length} rooms done. The unit test unlocks at 10.`;
   frEls.xpCount.textContent = frState.xp;
   frEls.streakCount.textContent = frState.streak;
   frEls.lessonReward.textContent = `+${frGetReward()} XP`;
@@ -882,6 +909,7 @@ function frRenderTask() {
   }
   const frBtn = document.getElementById("fr-unit-test-btn");
   if (frBtn) frBtn.hidden = pct !== 100;
+  if (frEls.completeTask) frEls.completeTask.textContent = roomButtonLabel(frState, module);
   frRenderActivity(task);
   renderLessonPlan("fr");
   renderNextLesson("fr");
@@ -914,6 +942,9 @@ function frCheckAnswer(answerIndex) {
   if (result.correct) {
     frState.streak += 1;
     if (result.earned) frState.xp += frGetReward();
+    frState.completed.add(task.id);
+    frRenderMaze();
+    frRenderTask();
   } else {
     frState.streak = 0;
   }
@@ -950,7 +981,7 @@ function frBindEvents() {
       frRenderModules();
       frRenderMaze();
       frRenderTask();
-      document.getElementById("fr-curriculum").scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("fr-start").scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
 
@@ -1017,9 +1048,12 @@ function frBindEvents() {
 
   if (frEls.completeTask) {
     frEls.completeTask.addEventListener("click", () => {
-      const task = frGetCurrentModule().tasks[frState.task];
-      frState.completed.add(task.id);
-      if (frState.task < frGetCurrentModule().tasks.length - 1) frState.task += 1;
+      const outcome = advanceRoom(frState, frGetCurrentModule(), "fr");
+      if (outcome === "unanswered") {
+        frEls.lessonFeedback.className = "lesson-feedback retry";
+        frEls.lessonFeedback.textContent = "Répondez d'abord : the room counts as done once you get the question right.";
+        return;
+      }
       frRenderMaze();
       frRenderTask();
     });
@@ -1234,6 +1268,8 @@ function startLesson(lang, level, index) {
   st.task = firstOpen === -1 ? 0 : firstOpen;
   if (lang === "fr") { frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask(); }
   else { renderLevelTabs(); renderModules(); renderMaze(); renderTask(); }
+  const theoryCard = document.getElementById(lang === "fr" ? "fr-theory-card" : "theory-card");
+  if (theoryCard && firstOpen <= 0) theoryCard.open = true;
   const target = document.getElementById(lang === "fr" ? "fr-practice" : "practice");
   if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1364,11 +1400,11 @@ function initNavSpy() {
   targets.forEach((t) => observer.observe(t));
 }
 
-// Practice room shortcuts: 1-4 pick an answer, arrows move between rooms.
+// Practice room shortcuts: 1-4 pick an answer, Enter moves on, arrows switch rooms.
 function initPracticeKeys() {
   const rooms = [
-    { section: "practice", options: "lesson-options", prev: "prev-task", next: "next-task" },
-    { section: "fr-practice", options: "fr-lesson-options", prev: "fr-prev-task", next: "fr-next-task" }
+    { section: "practice", options: "lesson-options", prev: "prev-task", next: "next-task", go: "complete-task" },
+    { section: "fr-practice", options: "fr-lesson-options", prev: "fr-prev-task", next: "fr-next-task", go: "fr-complete-task" }
   ].filter((r) => document.getElementById(r.section));
   if (!rooms.length) return;
   document.addEventListener("keydown", (e) => {
@@ -1381,6 +1417,9 @@ function initPracticeKeys() {
     if (!room) return;
     if (/^[1-4]$/.test(e.key)) {
       const btn = document.getElementById(room.options).querySelectorAll(".lesson-option")[Number(e.key) - 1];
+      if (btn) { btn.click(); e.preventDefault(); }
+    } else if (e.key === "Enter" && !e.target.closest("button, a, summary")) {
+      const btn = document.getElementById(room.go);
       if (btn) { btn.click(); e.preventDefault(); }
     } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const btn = document.getElementById(e.key === "ArrowLeft" ? room.prev : room.next);
