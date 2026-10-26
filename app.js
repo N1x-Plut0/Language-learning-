@@ -12,8 +12,14 @@ const moduleThemes = [
   { name: "Taupe + Fog", a: "#c2b4a9", b: "#cacaca", title: "City Loop", focus: "Questions, replies, and everyday choices" },
   { name: "Beige + Clay", a: "#ae9b8a", b: "#a58d78", title: "Grammar Gates", focus: "Sentence structure and accuracy" },
   { name: "Sage + Taupe", a: "#9a9d81", b: "#c2b4a9", title: "Story Turns", focus: "Reading, listening, and context" },
-  { name: "Fog + Beige", a: "#cacaca", b: "#ae9b8a", title: "Fluent Exit", focus: "Speaking, writing, and review" }
+  { name: "Fog + Beige", a: "#cacaca", b: "#ae9b8a", title: "Fluent Exit", focus: "Speaking, writing, and review" },
+  { name: "Sage + Fog", a: "#9a9d81", b: "#cacaca", title: "Summit Route", focus: "Real-life tasks and level check" }
 ];
+
+// Each CEFR level is split into two sub-levels: lessons 1-3 are X.1, lessons 4-6 are X.2.
+function subLevelOf(levelId, moduleIndex) {
+  return `${levelId}.${moduleIndex < Math.ceil(moduleThemes.length / 2) ? 1 : 2}`;
+}
 
 const taskPatterns = {
   A1: ["Greetings", "Alphabet sounds", "Numbers", "Nouns and articles", "Present tense", "Ordering food", "Family words", "Daily verbs", "Simple questions", "Mini dialogue"],
@@ -235,6 +241,8 @@ function init() {
   frInit();
   initLessonPlans();
   renderLanding();
+  initNavSpy();
+  initPracticeKeys();
 
   window.MazeApp = { getSnapshot, applySnapshot };
   window.dispatchEvent(new Event("maze-ready"));
@@ -333,7 +341,7 @@ function renderModules() {
   els.moduleList.innerHTML = modules.map((module, index) => `
     <button class="module-card ${index === state.module ? "active" : ""}" type="button" data-module="${index}" style="--module-a: ${module.a}; --module-b: ${module.b};">
       <strong>Module ${module.number}: ${module.title}</strong>
-      <span>${module.focus}</span>
+      <span>${subLevelOf(state.level, index)} · ${module.focus}</span>
     </button>
   `).join("");
 }
@@ -428,7 +436,7 @@ function bindEvents() {
     state.module = 0;
     state.task = 0;
     els.resultTitle.textContent = `${recommended.id} ${recommended.name}`;
-    els.resultCopy.textContent = `${score} of ${questions.length} correct. Start in ${recommended.id}, then move through all five maze modules.`;
+    els.resultCopy.textContent = `${score} of ${questions.length} correct. Start in ${recommended.id}, then work through its six lessons.`;
     els.scoreBar.style.width = `${Math.round((score / questions.length) * 100)}%`;
     renderLevelTabs();
     renderModules();
@@ -774,7 +782,7 @@ function frRenderModules() {
       data-fr-module="${index}"
       style="--module-a: ${module.a}; --module-b: ${module.b};">
       <strong>Module ${module.number}: ${module.title}</strong>
-      <span>${module.focus}</span>
+      <span>${subLevelOf(frState.level, index)} · ${module.focus}</span>
     </button>
   `).join("");
 }
@@ -906,7 +914,7 @@ function frBindEvents() {
       frState.module = 0;
       frState.task = 0;
       frEls.resultTitle.textContent = `${rec.id} — ${rec.name}`;
-      frEls.resultCopy.textContent = `${score} of ${frQuestions.length} correct. Start at ${rec.id} and work through all five maze modules.`;
+      frEls.resultCopy.textContent = `${score} of ${frQuestions.length} correct. Start at ${rec.id} and work through its six lessons.`;
       frEls.scoreBar.style.width = `${Math.round((score / frQuestions.length) * 100)}%`;
       frRenderLevelTabs();
       frRenderModules();
@@ -1067,15 +1075,23 @@ function renderLessonPlan(lang) {
   const book = src.books.find((b) => b.level === level);
   list.innerHTML = (src.plan[level] || []).map((lesson, index) => {
     const module = src.curriculum[level][index];
+    const sub = subLevelOf(level, index);
+    const groupHead = index === 0 || subLevelOf(level, index - 1) !== sub ? (() => {
+      const mods = src.curriculum[level].filter((_, i) => subLevelOf(level, i) === sub);
+      const first = src.curriculum[level].indexOf(mods[0]);
+      const rooms = mods.flatMap((m) => m.tasks);
+      const doneRooms = rooms.filter((t) => src.st.completed.has(t.id)).length;
+      return `<h3 class="book-level-heading plan-sublevel">${sub} · Lessons ${first + 1}–${first + mods.length} · ${doneRooms}/${rooms.length} rooms</h3>`;
+    })() : "";
     const theory = (src.theory[level] || [])[index] || { title: module.title, rules: [], examples: [], keyPattern: "" };
     const done = module.tasks.filter((t) => src.st.completed.has(t.id)).length;
     const pct = Math.round((done / module.tasks.length) * 100);
     const current = src.st.level === level && src.st.module === index;
-    return `
+    return `${groupHead}
       <details class="plan-card ${current ? "current" : ""}" data-plan-index="${index}" ${view.open.has(`${level}-${index}`) ? "open" : ""}
         style="--module-a: ${module.a}; --module-b: ${module.b};">
         <summary class="plan-summary">
-          <span class="plan-num">${level} · Lesson ${index + 1}</span>
+          <span class="plan-num">${sub} · Lesson ${index + 1}</span>
           <span class="plan-title">${theory.title}</span>
           <span class="plan-meta">${module.title} · ${lesson.minutes} min</span>
           <span class="plan-progress" aria-label="${done} of ${module.tasks.length} rooms complete">
@@ -1198,7 +1214,7 @@ function renderNextLesson(lang) {
   const src = planSource(lang);
   if (practiceLine) {
     const cur = lessonSummary(lang, src.st.level, src.st.module);
-    practiceLine.innerHTML = `Lesson ${src.st.module + 1} of 5: <strong>${cur.title}</strong> · ${cur.done}/${cur.total} rooms · <a href="#${lang}-plan">see lesson plan</a>`;
+    practiceLine.innerHTML = `${subLevelOf(src.st.level, src.st.module)} · Lesson ${src.st.module + 1} of ${src.curriculum[src.st.level].length}: <strong>${cur.title}</strong> · ${cur.done}/${cur.total} rooms · <a href="#${lang}-plan">see lesson plan</a>`;
   }
   if (!box) return;
   const next = findNextLesson(lang);
@@ -1212,7 +1228,7 @@ function renderNextLesson(lang) {
   box.innerHTML = `
     <article class="next-card" style="--module-a: ${info.module.a};">
       <div class="next-main">
-        <p class="next-kicker">${next.level} ${info.levelInfo ? info.levelInfo.name : ""} · Lesson ${next.index + 1} of 5${info.lesson ? ` · ${info.lesson.minutes} min` : ""}</p>
+        <p class="next-kicker">${subLevelOf(next.level, next.index)} ${info.levelInfo ? info.levelInfo.name : ""} · Lesson ${next.index + 1} of ${src.curriculum[next.level].length}${info.lesson ? ` · ${info.lesson.minutes} min` : ""}</p>
         <h3>${info.title}</h3>
         ${info.lesson ? `<ul class="next-goals">${info.lesson.goals.map((g) => `<li>${g}</li>`).join("")}</ul>` : ""}
         <div class="next-actions">
@@ -1245,8 +1261,8 @@ function renderLanding() {
     if (!next) { el.textContent = "Course complete"; return; }
     const info = lessonSummary(lang, next.level, next.index);
     el.textContent = st.completed.size
-      ? `Next: ${next.level} · Lesson ${next.index + 1} · ${info.title} (${info.pct}%)`
-      : `Start with ${next.level} · Lesson 1 · ${info.title}`;
+      ? `Next: ${subLevelOf(next.level, next.index)} · Lesson ${next.index + 1} · ${info.title} (${info.pct}%)`
+      : `Start with ${subLevelOf(next.level, next.index)} · Lesson ${next.index + 1} · ${info.title}`;
   });
 }
 
@@ -1293,6 +1309,53 @@ function initLessonPlans() {
   });
   document.querySelectorAll("[data-plan-print]").forEach((btn) => {
     btn.addEventListener("click", () => printLessonPlan(btn.dataset.planPrint));
+  });
+}
+
+// ─── SMALL UI HELPERS ────────────────────────────────────────────
+// Highlight the nav link of the section currently on screen.
+function initNavSpy() {
+  const links = [...document.querySelectorAll('.top-actions a[href^="#"]')];
+  const targets = links.map((a) => document.getElementById(a.getAttribute("href").slice(1))).filter(Boolean);
+  if (!targets.length || !("IntersectionObserver" in window)) return;
+  const visible = new Map();
+  const update = () => {
+    const best = targets.filter((t) => visible.get(t)).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
+    links.forEach((a) => {
+      const on = best && a.getAttribute("href") === `#${best.id}`;
+      a.classList.toggle("active", Boolean(on));
+      if (on) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+    });
+  };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((e) => visible.set(e.target, e.isIntersecting));
+    update();
+  }, { rootMargin: "-30% 0px -55% 0px" });
+  targets.forEach((t) => observer.observe(t));
+}
+
+// Practice room shortcuts: 1-4 pick an answer, arrows move between rooms.
+function initPracticeKeys() {
+  const rooms = [
+    { section: "practice", options: "lesson-options", prev: "prev-task", next: "next-task" },
+    { section: "fr-practice", options: "fr-lesson-options", prev: "fr-prev-task", next: "fr-next-task" }
+  ].filter((r) => document.getElementById(r.section));
+  if (!rooms.length) return;
+  document.addEventListener("keydown", (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest("input, textarea, select, [contenteditable]")) return;
+    if (document.querySelector(".unit-modal:not([hidden])")) return;
+    const room = rooms.find((r) => {
+      const box = document.getElementById(r.section).getBoundingClientRect();
+      return box.top < window.innerHeight * 0.6 && box.bottom > window.innerHeight * 0.4;
+    });
+    if (!room) return;
+    if (/^[1-4]$/.test(e.key)) {
+      const btn = document.getElementById(room.options).querySelectorAll(".lesson-option")[Number(e.key) - 1];
+      if (btn) { btn.click(); e.preventDefault(); }
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const btn = document.getElementById(e.key === "ArrowLeft" ? room.prev : room.next);
+      if (btn) { btn.click(); e.preventDefault(); }
+    }
   });
 }
 
@@ -1398,15 +1461,21 @@ function initUnitTest() {
   document.getElementById("unit-modal-submit").addEventListener("click", submitUnitTest);
   document.getElementById("unit-modal-retry").addEventListener("click", () => openUnitTest(unitTest.lang));
   document.getElementById("unit-modal-next").addEventListener("click", () => {
-    if (unitTest.lang === "fr") {
-      frState.module = (frState.module + 1) % frCurriculum[frState.level].length;
-      frState.task = 0;
-      frRenderModules(); frRenderMaze(); frRenderTask();
+    const isFr = unitTest.lang === "fr";
+    const st = isFr ? frState : state;
+    const ids = (isFr ? frLevels : levels).map((l) => l.id);
+    const count = (isFr ? frCurriculum : curriculum)[st.level].length;
+    if (st.module + 1 < count) {
+      st.module += 1;
+    } else if (ids.indexOf(st.level) + 1 < ids.length) {
+      st.level = ids[ids.indexOf(st.level) + 1];
+      st.module = 0;
     } else {
-      state.module = (state.module + 1) % curriculum[state.level].length;
-      state.task = 0;
-      renderModules(); renderMaze(); renderTask();
+      st.module = 0;
     }
+    st.task = 0;
+    if (isFr) { frRenderLevelTabs(); frRenderModules(); frRenderMaze(); frRenderTask(); }
+    else { renderLevelTabs(); renderModules(); renderMaze(); renderTask(); }
     closeUnitTest();
   });
 }

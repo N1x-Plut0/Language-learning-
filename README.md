@@ -1,14 +1,14 @@
 # Maze Academy
 
 A German & French language-learning site built as a curriculum "maze" — six CEFR
-levels (A1 → C1/C2), five modules each, ten short practice rooms per module — with
+levels (A1 → C1/C2), each split into two sub-levels (A1.1, A1.2 …), six modules per level, ten short practice rooms per module — with
 task questions, module theory, book recommendations, end-of-unit tests, and **user
 accounts** so progress follows you across devices.
 
 ## Features
 - 🇩🇪🇫🇷 Two full courses (German & French), each with 600+ practice questions, theory cards, unit tests, and reading lists.
 - 🧩 Interactive curriculum maze with XP, streaks, and per-module progress.
-- 📋 Lesson plans: one lesson per maze module (30 per language) with goals, grammar, vocabulary, rooms, speaking/writing tasks, and homework, all linked to the maze and ticked off as you progress. Printable.
+- 📋 Lesson plans: one lesson per maze module (36 per language, grouped into 12 sub-levels) with goals, grammar, vocabulary, rooms, speaking/writing tasks, and homework, all linked to the maze and ticked off as you progress. Printable.
 - 👤 **Accounts**: email + password sign-up/login, powered by [Supabase](https://supabase.com) (free, persistent).
 - 🙋 Guest mode: works without an account (progress saved in the browser), and syncs into your account when you log in.
 - ☁️ Fully static — hosted free on GitHub Pages, no server to run.
