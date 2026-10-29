@@ -8,6 +8,7 @@ accounts** so progress follows you across devices.
 ## Features
 - 🇩🇪🇫🇷 Two full courses (German & French), each with 600+ practice questions, theory cards, unit tests, and reading lists.
 - 🧩 Interactive curriculum maze with XP, streaks, and per-module progress.
+- 🔰 Starter for complete beginners: six mini-lessons per language (first words and phrases) with browser audio, pronunciation hints and a short check after each lesson. 🔊 buttons also read theory examples and lesson vocabulary aloud.
 - 📋 Lesson plans: one lesson per maze module (36 per language, grouped into 12 sub-levels) with goals, grammar, vocabulary, rooms, speaking/writing tasks, and homework, all linked to the maze and ticked off as you progress. Printable.
 - 👤 **Accounts**: email + password sign-up/login, powered by [Supabase](https://supabase.com) (free, persistent).
 - 🙋 Guest mode: works without an account (progress saved in the browser), and syncs into your account when you log in.
@@ -50,6 +51,7 @@ works offline as a guest; once the Supabase keys are set, accounts work locally 
 | `supabase-config.js` | Your Supabase URL + anon key. |
 | `schema.sql` | Database table + security policies (run once in Supabase). |
 | `de-*.js` / `fr-*.js` | Question banks, theory, unit tests, books. |
+| `de-starter.js` / `fr-starter.js` | Starter lessons: first words with pronunciation hints. |
 | `de-plan.js` / `fr-plan.js` | Lesson plans: goals, vocabulary and activities for each module. |
 | `styles.css` | All styling. |
 | `title-1/2/3.html` | Alternative landing pages. |

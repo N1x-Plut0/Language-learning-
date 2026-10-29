@@ -243,6 +243,8 @@ function init() {
   renderLanding();
   initNavSpy();
   initPracticeKeys();
+  initSpeech();
+  initStarter();
 
   window.MazeApp = { getSnapshot, applySnapshot };
   window.dispatchEvent(new Event("maze-ready"));
@@ -298,6 +300,10 @@ function applySnapshot(snap) {
     frRenderMaze();
     frRenderTask();
   }
+  ["de", "fr"].forEach((lang) => {
+    if (!starterView[lang].quiz) starterView[lang].lesson = null;
+    renderStarter(lang);
+  });
   renderLanding();
 }
 
@@ -404,7 +410,7 @@ function renderTask() {
   els.journeyCopy.textContent = state.streak > 0 ? `${state.streak} correct warm-up${state.streak === 1 ? "" : "s"} in a row. Keep the route glowing.` : "Choose a pace, then open any room in the maze.";
   els.lessonReward.textContent = `+${reward} XP`;
   if (typeof deModuleTheory !== "undefined") {
-    renderTheory(deModuleTheory, state.level, state.module, els.theoryModuleTitle, els.theoryBody);
+    renderTheory(deModuleTheory, state.level, state.module, els.theoryModuleTitle, els.theoryBody, "de");
   }
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
   if (els.completeTask) els.completeTask.textContent = roomButtonLabel(state, module);
@@ -619,13 +625,13 @@ function getReward() {
   return Math.max(10, Math.round(state.duration * 1.5));
 }
 
-function renderTheory(theoryBank, level, moduleIndex, titleEl, bodyEl) {
+function renderTheory(theoryBank, level, moduleIndex, titleEl, bodyEl, lang) {
   if (!titleEl || !bodyEl) return;
   const entry = theoryBank && theoryBank[level] && theoryBank[level][moduleIndex];
   if (!entry) { titleEl.textContent = "Module theory"; bodyEl.innerHTML = ""; return; }
   titleEl.textContent = entry.title;
   const rules = entry.rules.map((r) => `<li>${r}</li>`).join("");
-  const examples = entry.examples.map((ex) => `<tr><td>${ex.src}</td><td>${ex.tr}</td></tr>`).join("");
+  const examples = entry.examples.map((ex) => `<tr><td>${ex.src} ${lang ? sayButton(ex.src, lang) : ""}</td><td>${ex.tr}</td></tr>`).join("");
   bodyEl.innerHTML = `
     <ul class="theory-rules">${rules}</ul>
     <table class="theory-examples">${examples}</table>
@@ -905,7 +911,7 @@ function frRenderTask() {
   if (frEls.currentLevel) frEls.currentLevel.textContent = frState.level;
   if (frEls.selectedModuleLabel) frEls.selectedModuleLabel.textContent = `Module ${module.number}`;
   if (typeof frModuleTheory !== "undefined") {
-    renderTheory(frModuleTheory, frState.level, frState.module, frEls.theoryModuleTitle, frEls.theoryBody);
+    renderTheory(frModuleTheory, frState.level, frState.module, frEls.theoryModuleTitle, frEls.theoryBody, "fr");
   }
   const frBtn = document.getElementById("fr-unit-test-btn");
   if (frBtn) frBtn.hidden = pct !== 100;
@@ -1175,11 +1181,11 @@ function renderLessonPlan(lang) {
             <h4>2 · Grammar focus</h4>
             <ul>${theory.rules.map((r) => `<li>${r}</li>`).join("")}</ul>
             ${theory.keyPattern ? `<p class="plan-pattern"><strong>Key pattern:</strong> ${theory.keyPattern}</p>` : ""}
-            ${theory.examples.length ? `<table class="theory-examples">${theory.examples.map((ex) => `<tr><td>${ex.src}</td><td>${ex.tr}</td></tr>`).join("")}</table>` : ""}
+            ${theory.examples.length ? `<table class="theory-examples">${theory.examples.map((ex) => `<tr><td>${ex.src} ${sayButton(ex.src, lang)}</td><td>${ex.tr}</td></tr>`).join("")}</table>` : ""}
           </div>
           <div class="plan-block">
             <h4>3 · Vocabulary</h4>
-            <dl class="plan-vocab">${lesson.vocab.map(([w, m]) => `<dt>${w}</dt><dd>${m}</dd>`).join("")}</dl>
+            <dl class="plan-vocab">${lesson.vocab.map(([w, m]) => `<dt>${w} ${sayButton(w, lang)}</dt><dd>${m}</dd>`).join("")}</dl>
           </div>
           <div class="plan-block">
             <h4>4 · Maze rooms (${done}/${module.tasks.length})</h4>
@@ -1290,7 +1296,8 @@ function renderNextLesson(lang) {
     return;
   }
   const info = lessonSummary(lang, next.level, next.index);
-  const fresh = src.st.completed.size === 0;
+  const fresh = courseRoomsDone(lang) === 0;
+  const starterLeft = starterData(lang) && !starterAllDone(lang);
   box.innerHTML = `
     <article class="next-card" style="--module-a: ${info.module.a};">
       <div class="next-main">
@@ -1301,6 +1308,7 @@ function renderNextLesson(lang) {
           <button class="primary-btn" type="button" data-next-start>${info.done ? "Continue lesson" : "Start lesson"} →</button>
           <a class="secondary-btn" href="#${lang}-plan" data-next-plan>Read the lesson plan</a>
         </div>
+        ${fresh && starterLeft ? `<p class="next-hint">Don't know a word yet? <a href="#${lang}-starter">Begin with the Starter</a>: six short lessons with audio, before Lesson 1.</p>` : ""}
         ${fresh ? `<p class="next-hint">Not a beginner? <a href="#${placementId}">Take the placement check</a> to start at your level.</p>` : ""}
       </div>
       <div class="next-side">
@@ -1326,7 +1334,15 @@ function renderLanding() {
     const next = findNextLesson(lang);
     if (!next) { el.textContent = "Course complete"; return; }
     const info = lessonSummary(lang, next.level, next.index);
-    el.textContent = st.completed.size
+    const starterLeft = starterData(lang) && !starterAllDone(lang);
+    if (!courseRoomsDone(lang) && starterLeft) {
+      const n = firstOpenStarter(lang);
+      el.textContent = n === 0
+        ? "New to it? Start with 6 starter lessons: first words with audio"
+        : `Starter lesson ${n + 1} of ${starterData(lang).length}: ${starterData(lang)[n].title}`;
+      return;
+    }
+    el.textContent = courseRoomsDone(lang)
       ? `Next: ${subLevelOf(next.level, next.index)} · Lesson ${next.index + 1} · ${info.title} (${info.pct}%)`
       : `Start with ${subLevelOf(next.level, next.index)} · Lesson ${next.index + 1} · ${info.title}`;
   });
@@ -1378,6 +1394,258 @@ function initLessonPlans() {
   });
 }
 
+// ─── PRONUNCIATION (browser speech) ──────────────────────────────
+const SPEECH_LANG = { de: "de-DE", fr: "fr-FR" };
+const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+
+function escAttr(text) {
+  return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
+}
+
+// The "…" placeholders in phrases like "Ich heiße …" are not read aloud.
+function speak(text, lang) {
+  if (!canSpeak) return;
+  const clean = String(text).replace(/…/g, "").replace(/\s+/g, " ").trim();
+  if (!clean) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const utter = new SpeechSynthesisUtterance(clean);
+  utter.lang = SPEECH_LANG[lang] || lang;
+  utter.rate = 0.85;
+  const voice = synth.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith(utter.lang.slice(0, 2).toLowerCase()));
+  if (voice) utter.voice = voice;
+  synth.speak(utter);
+}
+
+function sayButton(text, lang, label = "Listen") {
+  if (!canSpeak) return "";
+  return `<button class="say-btn" type="button" data-say="${escAttr(text)}" data-say-lang="${lang}" aria-label="${label}: ${escAttr(text)}" title="${label}">🔊</button>`;
+}
+
+function initSpeech() {
+  if (!canSpeak) { document.body.classList.add("no-speech"); return; }
+  window.speechSynthesis.getVoices();
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-say]");
+    if (!btn) return;
+    e.preventDefault();
+    speak(btn.dataset.say, btn.dataset.sayLang);
+  });
+}
+
+// ─── STARTER (absolute beginners) ────────────────────────────────
+// Six mini-lessons before A1: learn the words with audio, then a short
+// quiz on only those words. Finished lessons are stored in the language's
+// completed set as "starter-<lang>-<n>", so they sync like other progress.
+const starterView = { de: { lesson: null, quiz: null }, fr: { lesson: null, quiz: null } };
+
+function starterData(lang) {
+  if (lang === "fr") return typeof frStarter !== "undefined" ? frStarter : null;
+  return typeof deStarter !== "undefined" ? deStarter : null;
+}
+function starterState(lang) { return lang === "fr" ? frState : state; }
+function starterId(lang, index) { return `starter-${lang}-${index + 1}`; }
+function starterDone(lang, index) { return starterState(lang).completed.has(starterId(lang, index)); }
+function starterAllDone(lang) {
+  const data = starterData(lang);
+  return Boolean(data) && data.every((_, i) => starterDone(lang, i));
+}
+function firstOpenStarter(lang) {
+  const data = starterData(lang) || [];
+  const i = data.findIndex((_, n) => !starterDone(lang, n));
+  return i === -1 ? 0 : i;
+}
+// Rooms finished in the main course (starter lessons not counted).
+function courseRoomsDone(lang) {
+  return [...starterState(lang).completed].filter((id) => !String(id).startsWith("starter-")).length;
+}
+
+function renderStarterTabs(lang) {
+  const tabs = document.getElementById(`${lang}-starter-tabs`);
+  const data = starterData(lang);
+  if (!tabs || !data) return;
+  const view = starterView[lang];
+  tabs.innerHTML = data.map((lesson, i) => `
+    <button class="level-tab ${i === view.lesson ? "active" : ""}" type="button" data-starter-lesson="${i}" title="${escAttr(lesson.title)}" aria-label="Starter lesson ${i + 1}: ${escAttr(lesson.title)}${starterDone(lang, i) ? " (done)" : ""}">${i + 1}${starterDone(lang, i) ? " ✓" : ""}</button>
+  `).join("");
+}
+
+function renderStarter(lang) {
+  const tabs = document.getElementById(`${lang}-starter-tabs`);
+  const body = document.getElementById(`${lang}-starter-body`);
+  const data = starterData(lang);
+  if (!tabs || !body || !data) return;
+  const view = starterView[lang];
+  if (view.lesson === null) view.lesson = firstOpenStarter(lang);
+
+  renderStarterTabs(lang);
+
+  if (view.quiz) { renderStarterQuiz(lang); return; }
+  const lesson = data[view.lesson];
+  body.innerHTML = `
+    <div class="starter-head">
+      <h3 class="book-level-heading">Lesson ${view.lesson + 1} of ${data.length}: ${lesson.title}${starterDone(lang, view.lesson) ? " ✓" : ""}</h3>
+      <p class="starter-intro">${lesson.intro}</p>
+    </div>
+    <div class="book-cards-row starter-words">
+      ${lesson.words.map((w) => `
+        <article class="book-card starter-card">
+          <div class="starter-word-row">
+            <p class="book-title starter-word" lang="${lang}">${w.w}</p>
+            ${sayButton(w.w, lang)}
+          </div>
+          <p class="book-author">say: <em>${w.say}</em></p>
+          <p class="starter-meaning">${w.en}</p>
+          ${w.note ? `<p class="book-desc">${w.note}</p>` : ""}
+        </article>`).join("")}
+    </div>
+    <div class="starter-actions">
+      <button class="primary-btn" type="button" data-starter-quiz>Check yourself →</button>
+      ${canSpeak ? `<button class="secondary-btn" type="button" data-starter-playall>🔊 Play all</button>` : ""}
+      <span class="starter-hint">Listen to every word and say it out loud before you check yourself.</span>
+    </div>
+  `;
+}
+
+// Quiz: each word once, alternating "hear/see the word → pick the meaning"
+// and "see the meaning → pick the word". Options come from the same lesson.
+function buildStarterQuiz(lang, index) {
+  const words = starterData(lang)[index].words;
+  const picked = shuffledOrder(words.length, `${Math.random()}`).slice(0, Math.min(6, words.length)).map((i) => words[i]);
+  return {
+    index, pos: 0, score: 0, missed: false, answered: false,
+    items: picked.map((word, n) => {
+      const toMeaning = n % 2 === 0;
+      const others = shuffledOrder(words.length, `${Math.random()}`).map((i) => words[i]).filter((w) => w !== word).slice(0, 3);
+      const choices = shuffledOrder(4, `${Math.random()}`).map((i) => [word, ...others][i]);
+      return {
+        word, toMeaning,
+        prompt: toMeaning ? word.w : word.en,
+        options: choices.map((c) => (toMeaning ? c.en : c.w)),
+        correct: choices.indexOf(word)
+      };
+    })
+  };
+}
+
+function renderStarterQuiz(lang) {
+  const body = document.getElementById(`${lang}-starter-body`);
+  const quiz = starterView[lang].quiz;
+  const lesson = starterData(lang)[quiz.index];
+  if (quiz.pos >= quiz.items.length) {
+    const total = quiz.items.length;
+    const passed = quiz.score >= total - 1;
+    if (passed) starterState(lang).completed.add(starterId(lang, quiz.index));
+    const last = quiz.index === starterData(lang).length - 1;
+    body.innerHTML = `
+      <div class="lesson-card starter-result">
+        <div class="lesson-card-topline"><span>${lesson.title}</span><span>Result</span></div>
+        <p class="starter-score">${quiz.score} / ${total} right first time</p>
+        <p class="lesson-feedback ${passed ? "good" : "retry"}">${passed
+          ? (last ? "Starter complete! You are ready for Lesson 1." : "Well done! The next starter lesson is open.")
+          : "Almost. Look at the cards once more, then try again."}</p>
+        <div class="starter-actions">
+          ${passed && !last ? `<button class="primary-btn" type="button" data-starter-next>Next starter lesson →</button>` : ""}
+          ${passed && last ? `<button class="primary-btn" type="button" data-starter-course>Start Lesson 1 →</button>` : ""}
+          ${!passed ? `<button class="primary-btn" type="button" data-starter-quiz>Try again</button>` : ""}
+          <button class="secondary-btn" type="button" data-starter-cards>Back to the words</button>
+        </div>
+      </div>`;
+    if (passed) { renderStarterTabs(lang); renderNextLesson(lang); renderLanding(); notifyProgressChange(); }
+    return;
+  }
+  const item = quiz.items[quiz.pos];
+  body.innerHTML = `
+    <div class="lesson-card starter-quiz">
+      <div class="lesson-card-topline">
+        <span>Question ${quiz.pos + 1} of ${quiz.items.length}</span>
+        <span>${item.toMeaning ? "What does it mean?" : "Which word is it?"}</span>
+      </div>
+      <p class="starter-prompt" ${item.toMeaning ? `lang="${lang}"` : ""}>${item.prompt} ${item.toMeaning ? sayButton(item.word.w, lang) : ""}</p>
+      <div class="lesson-options">
+        ${item.options.map((o, i) => `<button class="lesson-option" type="button" data-starter-answer="${i}" ${item.toMeaning ? "" : `lang="${lang}"`}>${o}</button>`).join("")}
+      </div>
+      <p class="lesson-feedback">${item.toMeaning ? "Pick the meaning. Keys 1–4 work too." : "Pick the right word. Keys 1–4 work too."}</p>
+      <div class="starter-actions" hidden><button class="primary-btn" type="button" data-starter-continue>Next →</button></div>
+    </div>`;
+  if (item.toMeaning) speak(item.word.w, lang);
+}
+
+function answerStarter(lang, index) {
+  const quiz = starterView[lang].quiz;
+  const item = quiz.items[quiz.pos];
+  const body = document.getElementById(`${lang}-starter-body`);
+  if (!item || quiz.answered) return;
+  const buttons = [...body.querySelectorAll("[data-starter-answer]")];
+  const feedback = body.querySelector(".lesson-feedback");
+  if (index === item.correct) {
+    quiz.answered = true;
+    if (!quiz.missed) quiz.score += 1;
+    buttons.forEach((b, i) => { b.classList.toggle("correct", i === item.correct); b.disabled = i !== item.correct; });
+    feedback.className = "lesson-feedback good";
+    feedback.innerHTML = `Right: <strong lang="${lang}">${item.word.w}</strong> = ${item.word.en}. ${sayButton(item.word.w, lang)}`;
+    if (!item.toMeaning) speak(item.word.w, lang);
+    body.querySelector(".starter-actions").hidden = false;
+    body.querySelector("[data-starter-continue]").focus();
+  } else {
+    quiz.missed = true;
+    buttons[index].classList.add("wrong");
+    buttons[index].disabled = true;
+    feedback.className = "lesson-feedback retry";
+    feedback.textContent = "Not this one. Try again.";
+  }
+}
+
+// The quiz is shorter than the word cards, so bring the section back into view.
+function showStarterTop(lang) {
+  const section = document.getElementById(`${lang}-starter`);
+  if (section && section.getBoundingClientRect().top < 0) section.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function initStarter() {
+  ["de", "fr"].forEach((lang) => {
+    const tabs = document.getElementById(`${lang}-starter-tabs`);
+    const body = document.getElementById(`${lang}-starter-body`);
+    if (!tabs || !body || !starterData(lang)) return;
+    const view = starterView[lang];
+    tabs.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-starter-lesson]");
+      if (!btn) return;
+      view.lesson = Number(btn.dataset.starterLesson);
+      view.quiz = null;
+      renderStarter(lang);
+    });
+    body.addEventListener("click", (e) => {
+      const t = e.target;
+      if (t.closest("[data-starter-answer]")) { answerStarter(lang, Number(t.closest("[data-starter-answer]").dataset.starterAnswer)); return; }
+      if (t.closest("[data-starter-continue]")) {
+        const quiz = view.quiz; quiz.pos += 1; quiz.missed = false; quiz.answered = false;
+        renderStarterQuiz(lang); return;
+      }
+      if (t.closest("[data-starter-quiz]")) { view.quiz = buildStarterQuiz(lang, view.lesson); renderStarter(lang); showStarterTop(lang); return; }
+      if (t.closest("[data-starter-cards]")) { view.quiz = null; renderStarter(lang); showStarterTop(lang); return; }
+      if (t.closest("[data-starter-next]")) { view.quiz = null; view.lesson = Math.min(view.lesson + 1, starterData(lang).length - 1); renderStarter(lang); showStarterTop(lang); return; }
+      if (t.closest("[data-starter-course]")) { view.quiz = null; renderStarter(lang); startLesson(lang, planSource(lang).levels[0].id, 0); return; }
+      if (t.closest("[data-starter-playall]")) {
+        const words = starterData(lang)[view.lesson].words;
+        words.forEach((w, i) => setTimeout(() => speak(w.w, lang), i * 1600));
+      }
+    });
+    // Keys 1-4 answer and Enter continues while the starter quiz is on screen.
+    document.addEventListener("keydown", (e) => {
+      if (!view.quiz || e.altKey || e.ctrlKey || e.metaKey) return;
+      const box = body.getBoundingClientRect();
+      if (box.bottom < 0 || box.top > window.innerHeight) return;
+      if (/^[1-4]$/.test(e.key)) { answerStarter(lang, Number(e.key) - 1); e.preventDefault(); }
+      else if (e.key === "Enter" && !e.target.closest("button, a")) {
+        const next = body.querySelector("[data-starter-continue]");
+        if (next && !next.closest("[hidden]")) { next.click(); e.preventDefault(); }
+      }
+    });
+    renderStarter(lang);
+  });
+}
+
 // ─── SMALL UI HELPERS ────────────────────────────────────────────
 // Highlight the nav link of the section currently on screen.
 function initNavSpy() {
@@ -1410,6 +1678,7 @@ function initPracticeKeys() {
   document.addEventListener("keydown", (e) => {
     if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest("input, textarea, select, [contenteditable]")) return;
     if (document.querySelector(".unit-modal:not([hidden])")) return;
+    if (e.target.closest(".starter-section")) return;
     const room = rooms.find((r) => {
       const box = document.getElementById(r.section).getBoundingClientRect();
       return box.top < window.innerHeight * 0.6 && box.bottom > window.innerHeight * 0.4;
