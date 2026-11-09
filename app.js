@@ -30,7 +30,24 @@ const taskPatterns = {
   C3: ["Near-native tone", "Dialect awareness", "Rhetorical control", "Literary texture", "Specialized vocabulary", "Humor and irony", "Dense lectures", "Policy argument", "Translation craft", "Masterclass task"]
 };
 
-const skills = ["Vocabulary", "Pronunciation", "Grammar", "Listening", "Speaking", "Reading", "Writing", "Culture", "Review", "Challenge"];
+// Every module has 12 rooms in this skill order; rooms/<lang>-<level>.js
+// supplies each room's title and three questions.
+const ROOM_SKILLS = ["Vocabulary", "Vocabulary", "Pronunciation", "Grammar", "Grammar", "Reading", "Listening", "Speaking", "Writing", "Culture", "Review", "Challenge"];
+const skills = ROOM_SKILLS;
+
+function roomBank(lang) {
+  return lang === "fr" ? window.frRooms : window.deRooms;
+}
+function roomData(lang, levelId, moduleIndex, taskIndex) {
+  const bank = roomBank(lang);
+  return (bank && bank[levelId] && bank[levelId][moduleIndex] && bank[levelId][moduleIndex][taskIndex]) || null;
+}
+// Title for room n: from the room data when this page loads it, otherwise
+// the level's generic room names (the home page doesn't load room data).
+function roomTitle(lang, levelId, moduleIndex, taskIndex, genericNames) {
+  const room = roomData(lang, levelId, moduleIndex, taskIndex);
+  return (room && room.t) || genericNames[taskIndex] || ROOM_SKILLS[taskIndex];
+}
 
 const questions = [
   {
@@ -148,35 +165,19 @@ const activityTemplates = [
 ];
 
 const coordinates = [
-  [9, 13],
-  [30, 13],
-  [30, 34],
-  [52, 34],
-  [52, 18],
-  [74, 18],
-  [74, 45],
-  [60, 45],
-  [60, 70],
-  [84, 70]
+  [8, 14], [26, 14], [26, 38], [44, 38], [44, 14], [62, 14],
+  [62, 38], [82, 38], [82, 66], [62, 66], [42, 66], [22, 66]
 ];
 
 const mobileCoordinates = [
-  [18, 8],
-  [72, 8],
-  [72, 24],
-  [30, 24],
-  [30, 42],
-  [78, 42],
-  [78, 58],
-  [24, 58],
-  [24, 78],
-  [76, 78]
+  [18, 6], [74, 6], [74, 20], [26, 20], [26, 34], [76, 34],
+  [76, 48], [24, 48], [24, 62], [76, 62], [76, 77], [28, 77]
 ];
 
 function buildCurriculum() {
   return Object.fromEntries(levels.map((level) => {
     const modules = moduleThemes.map((theme, moduleIndex) => {
-      const taskNames = taskPatterns[level.id];
+      const taskNames = ROOM_SKILLS.map((_, i) => roomTitle("de", level.id, moduleIndex, i, taskPatterns[level.id]));
       return {
         ...theme,
         number: moduleIndex + 1,
@@ -406,14 +407,14 @@ function renderTask() {
   els.taskMode.textContent = task.mode;
   els.progressRing.style.setProperty("--progress", percent);
   els.progressValue.textContent = `${percent}%`;
-  els.progressCopy.textContent = percent === 100 ? "All rooms done: take the unit test to finish the lesson." : `${completedInModule} of ${module.tasks.length} rooms done. The unit test unlocks at 10.`;
+  els.progressCopy.textContent = percent === 100 ? "All rooms done: take the unit test to finish the lesson." : `${completedInModule} of ${module.tasks.length} rooms done. The unit test unlocks at ${module.tasks.length}.`;
   els.journeyCopy.textContent = state.streak > 0 ? `${state.streak} correct warm-up${state.streak === 1 ? "" : "s"} in a row. Keep the route glowing.` : "Choose a pace, then open any room in the maze.";
   els.lessonReward.textContent = `+${reward} XP`;
   if (typeof deModuleTheory !== "undefined") {
     renderTheory(deModuleTheory, state.level, state.module, els.theoryModuleTitle, els.theoryBody, "de");
   }
   if (els.unitTestBtn) els.unitTestBtn.hidden = percent !== 100;
-  if (els.completeTask) els.completeTask.textContent = roomButtonLabel(state, module);
+  if (els.completeTask) els.completeTask.textContent = roomButtonLabel(state, module, "de");
   renderActivity(task);
   renderLessonPlan("de");
   renderNextLesson("de");
@@ -505,7 +506,7 @@ function bindEvents() {
     const outcome = advanceRoom(state, getCurrentModule(), "de");
     if (outcome === "unanswered") {
       els.lessonFeedback.className = "lesson-feedback retry";
-      els.lessonFeedback.textContent = "Answer the question above first: the room counts as done once you get it right.";
+      els.lessonFeedback.textContent = "Answer the question above first: the room counts as done once you get its questions right.";
       return;
     }
     renderMaze();
@@ -557,8 +558,14 @@ function bankedActivity(banked, seed, goodText) {
 // Room flow: a room counts as done once its question is answered correctly
 // (or the answer was revealed). The main button then moves on, and on the
 // last room of a finished module it opens the unit test.
-function roomButtonLabel(st, module) {
+function roomButtonLabel(st, module, lang) {
   const task = module.tasks[st.task];
+  const room = lang && roomData(lang, st.level, st.module, st.task);
+  if (room) {
+    const prog = roomStep(lang, task.id);
+    if (prog.answered && prog.step < room.qs.length - 1) return "Next question →";
+    if (!prog.answered && !st.completed.has(task.id)) return "Complete room";
+  }
   const done = st.completed.has(task.id);
   const allDone = module.tasks.every((t) => st.completed.has(t.id));
   if (!done) return "Complete room";
@@ -568,12 +575,86 @@ function roomButtonLabel(st, module) {
 
 function advanceRoom(st, module, lang) {
   const task = module.tasks[st.task];
+  const room = roomData(lang, st.level, st.module, st.task);
+  if (room) {
+    const prog = roomStep(lang, task.id);
+    if (prog.answered && prog.step < room.qs.length - 1) {
+      prog.step += 1;
+      prog.answered = false;
+      return "next-question";
+    }
+    if (!prog.answered && !st.completed.has(task.id)) return "unanswered";
+  }
   if (!st.completed.has(task.id)) return "unanswered";
   if (module.tasks.every((t) => st.completed.has(t.id))) { openUnitTest(lang); return "test"; }
   const nextOpen = module.tasks.findIndex((t, i) => i > st.task && !st.completed.has(t.id));
   const firstOpen = module.tasks.findIndex((t) => !st.completed.has(t.id));
   st.task = nextOpen !== -1 ? nextOpen : firstOpen;
+  roomSteps.delete(`${lang}:${module.tasks[st.task].id}`);
   return "moved";
+}
+
+// Rooms hold several questions. roomSteps tracks, per room, which question
+// is showing and whether it has been answered; a room is done after its last.
+const roomSteps = new Map();
+const questionsSolved = new Set();
+
+function roomStep(lang, taskId) {
+  const key = `${lang}:${taskId}`;
+  if (!roomSteps.has(key)) roomSteps.set(key, { step: 0, answered: false });
+  return roomSteps.get(key);
+}
+
+function roomActivity(lang, st, taskId, goodText) {
+  const room = roomData(lang, st.level, st.module, st.task);
+  if (!room || !room.qs || !room.qs.length) return null;
+  const prog = roomStep(lang, taskId);
+  if (prog.step >= room.qs.length) prog.step = 0;
+  const q = room.qs[prog.step];
+  const activity = bankedActivity(q, `${taskId}#${prog.step}`, goodText);
+  return {
+    ...activity,
+    key: `${lang}:${taskId}#${prog.step}`,
+    say: q.say || "",
+    step: prog.step,
+    total: room.qs.length,
+    answered: prog.answered,
+    hideSaid: room.s === "Listening"
+  };
+}
+
+// Prompt text plus a listen button when the question has audio. Without
+// browser speech, Listening questions print the sentence instead.
+function renderPrompt(el, activity, lang, text) {
+  el.textContent = text;
+  if (!activity.say) return;
+  if (canSpeak) el.insertAdjacentHTML("beforeend", ` ${sayButton(activity.say, lang)}`);
+  else if (activity.hideSaid) el.insertAdjacentHTML("beforeend", ` <em lang="${lang}">“${escAttr(activity.say)}”</em>`);
+}
+
+function renderStepLabel(optionsEl, activity) {
+  const label = optionsEl.closest(".lesson-card") && optionsEl.closest(".lesson-card").querySelector(".lesson-card-topline span");
+  if (label) label.textContent = activity.total ? `Question ${activity.step + 1} of ${activity.total}` : "Warm-up";
+}
+
+// Answer flow shared by both languages. Returns what happened so the caller
+// can update XP and re-render.
+function answerRoom(lang, st, task, activity, answerIndex, ui) {
+  const multi = Boolean(activity.key);
+  const result = applyAnswer({
+    taskId: multi ? activity.key : task.id, activity, answerIndex,
+    optionsEl: ui.optionsEl, feedbackEl: ui.feedbackEl, solvedSet: multi ? questionsSolved : st.solved,
+    retryText: ui.retryText, revealText: ui.revealText
+  });
+  if (!result.correct) return { ...result, roomDone: false };
+  let roomDone = true;
+  if (multi) {
+    const prog = roomStep(lang, task.id);
+    prog.answered = true;
+    roomDone = prog.step >= activity.total - 1;
+  }
+  if (roomDone) { st.completed.add(task.id); st.solved.add(task.id); }
+  return { ...result, roomDone };
 }
 
 // Wrong answers: the first miss only marks the chosen option; the second
@@ -608,6 +689,8 @@ function applyAnswer({ taskId, activity, answerIndex, optionsEl, feedbackEl, sol
 }
 
 function getActivity(task = getCurrentTask()) {
+  const room = roomActivity("de", state, task.id, "Richtig!");
+  if (room) return room;
   const banked = (typeof deTaskQBank !== "undefined")
     ? getTaskQ(deTaskQBank, state.level, state.task, state.module)
     : null;
@@ -641,8 +724,9 @@ function renderTheory(theoryBank, level, moduleIndex, titleEl, bodyEl, lang) {
 
 function renderActivity(task) {
   const activity = getActivity(task);
-  const solved = state.solved.has(task.id);
-  els.lessonPrompt.textContent = activity.prompt(task, state.level);
+  const solved = activity.key ? activity.answered : state.solved.has(task.id);
+  renderPrompt(els.lessonPrompt, activity, "de", activity.prompt(task, state.level));
+  renderStepLabel(els.lessonOptions, activity);
   els.lessonOptions.innerHTML = activity.options(task).map((option, index) => `
     <button class="lesson-option ${solved && index === activity.correct ? "correct" : ""}" type="button" data-answer="${index}">
       ${option}
@@ -655,19 +739,16 @@ function renderActivity(task) {
 function checkActivityAnswer(answerIndex) {
   const task = getCurrentTask();
   const activity = getActivity(task);
-  const result = applyAnswer({
-    taskId: task.id, activity, answerIndex,
-    optionsEl: els.lessonOptions, feedbackEl: els.lessonFeedback, solvedSet: state.solved,
+  const result = answerRoom("de", state, task, activity, answerIndex, {
+    optionsEl: els.lessonOptions, feedbackEl: els.lessonFeedback,
     retryText: "Not quite. Have another look and try again.",
     revealText: "The answer is:"
   });
   if (result.correct) {
     state.streak += 1;
     if (result.earned) state.xp += getReward();
-    state.completed.add(task.id);
-    renderMaze();
-    renderTask();
-    celebrate();
+    if (result.roomDone) { renderMaze(); renderTask(); celebrate(); }
+    else if (els.completeTask) els.completeTask.textContent = roomButtonLabel(state, getCurrentModule(), "de");
   } else {
     state.streak = 0;
   }
@@ -784,7 +865,7 @@ function frBuildCurriculum() {
     const modules = moduleThemes.map((theme, moduleIndex) => ({
       ...theme,
       number: moduleIndex + 1,
-      tasks: frTaskPatterns[level.id].map((name, taskIndex) => ({
+      tasks: ROOM_SKILLS.map((_, i) => roomTitle("fr", level.id, moduleIndex, i, frTaskPatterns[level.id])).map((name, taskIndex) => ({
         id: `fr-${level.id}-${moduleIndex + 1}-${taskIndex + 1}`,
         number: taskIndex + 1,
         title: name,
@@ -804,6 +885,8 @@ function frGetCurrentModule() { return frCurriculum[frState.level][frState.modul
 function frGetCurrentTask()   { return frGetCurrentModule().tasks[frState.task]; }
 function frGetActivity(task)  {
   task = task || frGetCurrentTask();
+  const room = roomActivity("fr", frState, task.id, "Correct !");
+  if (room) return room;
   const banked = (typeof frTaskQBank !== "undefined")
     ? getTaskQ(frTaskQBank, frState.level, frState.task, frState.module)
     : null;
@@ -904,7 +987,7 @@ function frRenderTask() {
   frEls.progressValue.textContent = `${pct}%`;
   frEls.progressCopy.textContent = pct === 100
     ? "All rooms done: take the unit test to finish the lesson."
-    : `${done} of ${module.tasks.length} rooms done. The unit test unlocks at 10.`;
+    : `${done} of ${module.tasks.length} rooms done. The unit test unlocks at ${module.tasks.length}.`;
   frEls.xpCount.textContent = frState.xp;
   frEls.streakCount.textContent = frState.streak;
   frEls.lessonReward.textContent = `+${frGetReward()} XP`;
@@ -915,7 +998,7 @@ function frRenderTask() {
   }
   const frBtn = document.getElementById("fr-unit-test-btn");
   if (frBtn) frBtn.hidden = pct !== 100;
-  if (frEls.completeTask) frEls.completeTask.textContent = roomButtonLabel(frState, module);
+  if (frEls.completeTask) frEls.completeTask.textContent = roomButtonLabel(frState, module, "fr");
   frRenderActivity(task);
   renderLessonPlan("fr");
   renderNextLesson("fr");
@@ -925,8 +1008,9 @@ function frRenderTask() {
 function frRenderActivity(task) {
   if (!frEls.lessonPrompt) return;
   const activity = frGetActivity(task);
-  const solved = frState.solved.has(task.id);
-  frEls.lessonPrompt.textContent = activity.prompt(task, frState.level);
+  const solved = activity.key ? activity.answered : frState.solved.has(task.id);
+  renderPrompt(frEls.lessonPrompt, activity, "fr", activity.prompt(task, frState.level));
+  renderStepLabel(frEls.lessonOptions, activity);
   frEls.lessonOptions.innerHTML = activity.options(task).map((opt, i) => `
     <button class="lesson-option ${solved && i === activity.correct ? "correct" : ""}" type="button" data-fr-answer="${i}">${opt}</button>
   `).join("");
@@ -939,18 +1023,16 @@ function frRenderActivity(task) {
 function frCheckAnswer(answerIndex) {
   const task = frGetCurrentTask();
   const activity = frGetActivity(task);
-  const result = applyAnswer({
-    taskId: task.id, activity, answerIndex,
-    optionsEl: frEls.lessonOptions, feedbackEl: frEls.lessonFeedback, solvedSet: frState.solved,
+  const result = answerRoom("fr", frState, task, activity, answerIndex, {
+    optionsEl: frEls.lessonOptions, feedbackEl: frEls.lessonFeedback,
     retryText: "Pas tout à fait. Have another look and try again.",
     revealText: "La bonne réponse :"
   });
   if (result.correct) {
     frState.streak += 1;
     if (result.earned) frState.xp += frGetReward();
-    frState.completed.add(task.id);
-    frRenderMaze();
-    frRenderTask();
+    if (result.roomDone) { frRenderMaze(); frRenderTask(); }
+    else if (frEls.completeTask) frEls.completeTask.textContent = roomButtonLabel(frState, frGetCurrentModule(), "fr");
   } else {
     frState.streak = 0;
   }
@@ -1057,7 +1139,7 @@ function frBindEvents() {
       const outcome = advanceRoom(frState, frGetCurrentModule(), "fr");
       if (outcome === "unanswered") {
         frEls.lessonFeedback.className = "lesson-feedback retry";
-        frEls.lessonFeedback.textContent = "Répondez d'abord : the room counts as done once you get the question right.";
+        frEls.lessonFeedback.textContent = "Répondez d'abord : the room counts as done once you get its questions right.";
         return;
       }
       frRenderMaze();
@@ -1203,7 +1285,7 @@ function renderLessonPlan(lang) {
           </div>
           <div class="plan-block">
             <h4>7 · Check</h4>
-            <p>Unit test: 10 questions on this module. It unlocks when all 10 rooms are complete.</p>
+            <p>Unit test: 10 questions on this module. It unlocks when all ${module.tasks.length} rooms are complete.</p>
             ${book ? `<p><strong>Reading:</strong> ${book.title} (${book.author})</p>` : ""}
           </div>
           <div class="plan-block">

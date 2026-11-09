@@ -1796,7 +1796,7 @@ h3 {
   .lesson-options { grid-template-columns: 1fr; }
   .hero-metrics span { min-height: 0; }
   .word-collage { grid-template-columns: repeat(2, 1fr); }
-  .maze-map { min-height: 620px; }
+  .maze-map { min-height: 720px; }
   .task-node { width: 54px; }
   .task-topline,
   .task-actions {
